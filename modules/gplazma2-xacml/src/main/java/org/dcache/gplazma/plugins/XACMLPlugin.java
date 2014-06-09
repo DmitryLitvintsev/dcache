@@ -25,6 +25,8 @@ import java.util.concurrent.TimeUnit;
 import javax.security.auth.x500.X500Principal;
 
 import org.dcache.auth.LoginNamePrincipal;
+import org.dcache.auth.LoginGidPrincipal;
+import org.dcache.auth.LoginUidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.gplazma.AuthenticationException;
 import org.dcache.gplazma.util.CertificateUtils;
@@ -386,7 +388,7 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
             }
         }
 
-        logger.debug("VOMS extensions found: {}", extensions);
+        logger.debug("VOMS extenscd ions found: {}", extensions);
 
         checkAuthentication(!extensions.isEmpty(), "no subjects found to map");
 
@@ -397,12 +399,24 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
          * retrieve the first valid mapping and add it to the identified
          * principals
          */
-        final String userName = getMappingFor(login, extensions);
-        if (userName == null) {
-            throw new AuthenticationException("no mapping for: " + extensions);
+        final LocalId localId = getMappingFor(login, extensions);
+
+        if (localId == null) {
+             throw new AuthenticationException("no mapping for: " + extensions);
         }
 
-        identifiedPrincipals.add(new UserNamePrincipal(userName));
+        if (localId.getUserName() != null) {
+            identifiedPrincipals.add(new UserNamePrincipal(localId.getUserName()));
+        }
+
+        if (localId.getUID() != null) {
+            identifiedPrincipals.add(new LoginUidPrincipal(localId.getUID()));
+        }
+
+        if (localId.getGID() != null) {
+            //identifiedPrincipals.add(new GidPrincipal(localId.getGID(),true));
+            identifiedPrincipals.add(new LoginGidPrincipal(localId.getGID()));
+        }
     }
 
     /**
@@ -576,7 +590,7 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
      *            all groups of extracted VOMS extensions
      * @return local id or <code>null</code> if no mapping is found
      */
-    private String getMappingFor(final Principal login,
+    private LocalId getMappingFor(final Principal login,
                     final Set<VomsExtensions> extensionSet) {
         for (final VomsExtensions extensions : extensionSet) {
             try {
@@ -585,7 +599,7 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
                 if ( name == null ) continue;
                 if (login == null || login.getName().equals(name)) {
                     logger.debug("getMappingFor {} = {}", extensions, name);
-                    return name;
+                    return localId;
                 }
             } catch (final ExecutionException t) {
                 /*

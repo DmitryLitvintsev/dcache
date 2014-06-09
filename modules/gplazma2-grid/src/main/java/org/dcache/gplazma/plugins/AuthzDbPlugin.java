@@ -31,6 +31,10 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Longs;
 import com.google.common.base.Splitter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 /**
  * Plugin uses AuthzDB for mapping group names and user names to UID,
  * GIDs.
@@ -48,6 +52,8 @@ import com.google.common.base.Splitter;
 public class AuthzDbPlugin
     implements GPlazmaMappingPlugin, GPlazmaSessionPlugin
 {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthzDbPlugin.class);
     private static final long REFRESH_PERIOD =
         TimeUnit.SECONDS.toMillis(10);
 
@@ -122,30 +128,35 @@ public class AuthzDbPlugin
         for (PrincipalType type: order) {
             switch (type) {
             case UID:
+                LOGGER.warn("UID: {}", loginUid);
                 if (loginUid != null) {
                     return new UserAuthzInformation(null, null, loginUid, null, null, null, null);
                 }
                 break;
 
             case GID:
+                LOGGER.warn("GID: {}", loginGid);
                 if (loginGid != null) {
                     return new UserAuthzInformation(null, null, 0, new long[] { loginGid.longValue() }, null, null, null);
                 }
                 break;
 
             case LOGIN:
+                LOGGER.warn("LOGIN: {}", loginName);
                 if (loginName != null) {
                     return getEntity(loginName);
                 }
                 break;
 
             case USER:
+                LOGGER.warn("USER: {}", userName);
                 if (userName != null) {
                     return getEntity(userName);
                 }
                 break;
 
             case GROUP:
+                LOGGER.warn("GROUP: {}", primaryGroup);
                 if (primaryGroup != null) {
                     return getEntity(primaryGroup);
                 }
@@ -162,6 +173,7 @@ public class AuthzDbPlugin
     {
         /* Classify input principals.
          */
+        LOGGER.warn("We are in map");
         List<String> names = Lists.newArrayList();
         String loginName = null;
         Long loginUid = null;
@@ -174,30 +186,42 @@ public class AuthzDbPlugin
                     throw new AuthenticationException("multiple login names");
                 }
                 loginName = principal.getName();
+                LOGGER.warn("loginName: {}",loginName);
             } else if (principal instanceof LoginUidPrincipal) {
                 if (loginUid != null) {
                     throw new AuthenticationException("multiple login UIDs");
                 }
                 loginUid = ((LoginUidPrincipal) principal).getUid();
+                LOGGER.warn("loginUid: {}",loginUid);
             } else if (principal instanceof LoginGidPrincipal) {
                 if (loginGid != null) {
                     throw new AuthenticationException("multiple login GIDs");
                 }
                 loginGid = ((LoginGidPrincipal) principal).getGid();
+                LOGGER.warn("loginGid: {}",loginGid);
+            } else if (principal instanceof GidPrincipal) {
+                if (loginGid != null) {
+                    throw new AuthenticationException("multiple login GIDs");
+                }
+                loginGid = ((GidPrincipal) principal).getGid();
+                LOGGER.warn("loginGid: {}",loginGid);
             } else if (principal instanceof UserNamePrincipal) {
                 if (userName != null) {
                     throw new AuthenticationException("multiple usernames");
                 }
                 userName = principal.getName();
                 names.add(userName);
+                LOGGER.warn("userName: {}",userName);
             } else if (principal instanceof GroupNamePrincipal) {
                 if (((GroupNamePrincipal) principal).isPrimaryGroup()) {
                     if (primaryGroup != null) {
                         throw new AuthenticationException("multiple primary group names");
                     }
                     primaryGroup = principal.getName();
+                    LOGGER.warn("primaryGroup: {}",primaryGroup);
                 }
                 names.add(principal.getName());
+                LOGGER.warn("GroupName: {}",principal.getName());
             }
         }
 
@@ -206,9 +230,11 @@ public class AuthzDbPlugin
         List<Long> uids = Lists.newArrayList();
         List<Long> gids = Lists.newArrayList();
         for (String name: names) {
+            LOGGER.warn("name = {}",name);
             Collection<UserAuthzInformation> mappings =
                 _map.getValuesForPredicatesMatching(name);
             for (UserAuthzInformation mapping: mappings) {
+                LOGGER.warn("mapping = {} {}",mapping.getUid(),mapping.getGids());
                 uids.add(mapping.getUid());
                 gids.addAll(Longs.asList(mapping.getGids()));
             }
