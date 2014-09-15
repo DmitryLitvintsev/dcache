@@ -48,7 +48,7 @@ public class RequestExecutionTimeGauge {
     /**
      * number of updates
      */
-    private int  updateNum=0;
+    private long  updateNum=0;
     /**
      * last value fed to the gauge
      */
@@ -209,7 +209,7 @@ public class RequestExecutionTimeGauge {
     /**
      * @return the updateNum
      */
-    public synchronized int getUpdateNum() {
+    public synchronized long getUpdateNum() {
         return updateNum;
     }
 
