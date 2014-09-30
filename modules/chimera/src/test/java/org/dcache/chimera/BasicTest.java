@@ -865,4 +865,54 @@ public class BasicTest extends ChimeraTestCaseHelper {
 
         assertTrue(statBefore.getMTime() != statAfter.getMTime());
     }
+
+    @Test
+    public void testSetAttribitesOnTag() throws Exception {
+        final String tagName = "myTag";
+
+        FsInode base = _rootInode.mkdir("junit");
+        _fs.createTag(base, tagName);
+        FsInode tagInode = new FsInode_TAG(_fs, base.toString(), tagName);
+
+        Stat stat = tagInode.stat();
+        Stat baseStat = base.stat();
+
+        stat.setUid(123);
+        _fs.setInodeAttributes(tagInode, 0, stat);
+
+        assertEquals(baseStat, base.stat());
+    }
+
+    /**
+
+    @Test
+    public void testBackwardCompatibility() throws Exception {
+
+        byte[] oldId = "0:TAG:0000DA875B38D9E0461F9ADFEA7C7422A956:somelongtagname".getBytes(Charsets.UTF_8);
+        final FsInode inodeWithOldId = _fs.inodeFromBytes(oldId);
+        byte[] newId = inodeWithOldId.getIdentifier();
+        final FsInode inodeWithNewId = _fs.inodeFromBytes(newId);
+
+        assertTrue(newId.length < oldId.length);
+        assertEquals(inodeWithOldId, inodeWithNewId);
+    }
+
+    **/
+
+    @Test(expected = FileNotFoundHimeraFsException.class)
+    public void testGetParentOnRoot() throws Exception {
+        String id = _rootInode.toString();
+        _rootInode.inodeOf(".(parent)(" + id + ")");
+    }
+
+    /**
+    private void assertHasChecksum(Checksum expectedChecksum, FsInode inode) throws Exception {
+        for(Checksum checksum: _fs.getInodeChecksums(inode)) {
+            if (checksum.equals(expectedChecksum)) {
+                return;
+            }
+        }
+        fail("No checksums");
+    }
+    **/
 }
