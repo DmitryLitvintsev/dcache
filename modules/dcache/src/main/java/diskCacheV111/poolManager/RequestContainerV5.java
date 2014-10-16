@@ -91,7 +91,7 @@ public class RequestContainerV5
     private String      _warningPath   = "billing" ;
     private long        _retryTimer    = 15 * 60 * 1000 ;
 
-    private int         _maxRequestClumping = 20;
+    private int         _maxRequestClumping = 100;
 
     private String      _onError       = "suspend" ;
     private int         _maxRetries    = 3 ;
