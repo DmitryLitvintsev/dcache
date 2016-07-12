@@ -49,6 +49,7 @@ import org.dcache.chimera.InvalidArgumentChimeraException;
 import org.dcache.chimera.IsDirChimeraException;
 import org.dcache.chimera.JdbcFs;
 import org.dcache.chimera.NotDirChimeraException;
+import org.dcache.chimera.PermissionDeniedChimeraFsException;
 import org.dcache.chimera.StorageGenericLocation;
 import org.dcache.nfs.status.BadOwnerException;
 import org.dcache.nfs.status.ExistException;
@@ -58,6 +59,7 @@ import org.dcache.nfs.status.NfsIoException;
 import org.dcache.nfs.status.NoEntException;
 import org.dcache.nfs.status.NotDirException;
 import org.dcache.nfs.status.NotEmptyException;
+import org.dcache.nfs.status.PermException;
 import org.dcache.nfs.status.StaleException;
 import org.dcache.nfs.v4.NfsIdMapping;
 import org.dcache.nfs.v4.acl.Acls;
@@ -181,7 +183,10 @@ public class ChimeraVfs implements VirtualFileSystem, AclCheckable {
             throw new NotEmptyException("directory exist and not empty");
         } catch (FileNotFoundHimeraFsException e) {
             throw new NoEntException("file not found");
+        } catch (PermissionDeniedChimeraFsException e) {
+            throw new PermException(e.getMessage());
         }
+
     }
 
     @Override
