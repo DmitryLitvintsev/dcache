@@ -57,36 +57,51 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.webadmin.model.dataaccess.impl;
+package org.dcache.alarms.spi;
 
-import java.util.Collection;
+import org.springframework.beans.factory.annotation.Required;
 
-import org.dcache.alarms.dao.AlarmJDOUtils.AlarmDAOFilter;
-import org.dcache.alarms.LogEntry;
-import org.dcache.webadmin.model.dataaccess.LogEntryDAO;
+import java.util.Map;
+
+import org.dcache.alarms.file.FileBackedAlarmPriorityMap;
 
 /**
- * For use with the 'off' Spring profile.
- * Should never be called, but just in case,
- * this avoids NPEs.
+ * <p>Factory for creating and configuring listeners which require
+ * only properties from the environment/configuration map.</p>
  *
- * @author arossi
+ * <p>Included in the injection are the alarm type priorities.</p>
  */
-public class NOPAlarmStore implements LogEntryDAO {
+public class StandardLogEntryListenerFactory
+                extends BaseLogEntryListenerFactory<StandardLogEntryListener> {
+    /**
+     * <p>Map is injected after being built using
+     * a {@link org.dcache.util.ConfigurationMapFactoryBean}.</p>
+     */
+    private Map<String, String> configuration;
 
-    public Collection<LogEntry> get(AlarmDAOFilter filter) {
-        return null;
+    /**
+     * <p>Make available to the listeners the mapping of
+     * alarm type to priority.</p>
+     */
+    private FileBackedAlarmPriorityMap priorityMap;
+
+    public StandardLogEntryListenerFactory() {
+        super(StandardLogEntryListener.class);
     }
 
-    public long remove(Collection<LogEntry> selected) {
-        return 0;
+    @Required
+    public void setConfiguration(Map<String, String> configuration) {
+        this.configuration = configuration;
     }
 
-    public long update(Collection<LogEntry> selected) {
-        return 0;
+    @Required
+    public void setPriorityMap(FileBackedAlarmPriorityMap priorityMap) {
+        this.priorityMap = priorityMap;
     }
 
-    public boolean isConnected() {
-        return false;
+    @Override
+    protected void configureListener(StandardLogEntryListener listener) {
+        listener.setPriorityMap(priorityMap);
+        listener.configure(configuration);
     }
 }

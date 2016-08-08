@@ -76,8 +76,8 @@ import org.dcache.alarms.Alarm;
 import org.dcache.alarms.AlarmDefinition;
 import org.dcache.alarms.AlarmDefinitionsMap;
 import org.dcache.alarms.AlarmMarkerFactory;
+import org.dcache.alarms.LogEntry;
 import org.dcache.alarms.PredefinedAlarm;
-import org.dcache.alarms.dao.LogEntry;
 import org.dcache.commons.util.NDC;
 import org.dcache.util.NetworkUtils;
 

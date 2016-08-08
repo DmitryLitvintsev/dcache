@@ -57,36 +57,49 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.webadmin.model.dataaccess.impl;
+package org.dcache.alarms.spi;
 
+import java.util.ArrayList;
 import java.util.Collection;
-
-import org.dcache.alarms.dao.AlarmJDOUtils.AlarmDAOFilter;
-import org.dcache.alarms.LogEntry;
-import org.dcache.webadmin.model.dataaccess.LogEntryDAO;
+import java.util.Collections;
+import java.util.ServiceLoader;
 
 /**
- * For use with the 'off' Spring profile.
- * Should never be called, but just in case,
- * this avoids NPEs.
- *
- * @author arossi
+ * <p>Does the basic work of loading and invocation of listeners
+ *    bound to the given factory type.</p>
  */
-public class NOPAlarmStore implements LogEntryDAO {
+public abstract class BaseLogEntryListenerFactory<L extends LogEntryListener>
+                implements LogEntryListenerFactory<L> {
+    private final Collection<L> listeners = Collections.synchronizedList(new ArrayList<>());
 
-    public Collection<LogEntry> get(AlarmDAOFilter filter) {
-        return null;
+    /**
+     * Set from the default constructor of the factory class.
+     */
+    protected final Class<L> clzz;
+
+    protected BaseLogEntryListenerFactory(Class<L> clzz) {
+        this.clzz = clzz;
     }
 
-    public long remove(Collection<LogEntry> selected) {
-        return 0;
+    @Override
+    public Collection<L> getConfiguredListeners() {
+        return listeners;
     }
 
-    public long update(Collection<LogEntry> selected) {
-        return 0;
+    @Override
+    public void load() {
+        ServiceLoader<L> serviceLoader = ServiceLoader.load(clzz);
+        for (L listener : serviceLoader) {
+            configureListener(listener);
+            listeners.add(listener);
+        }
     }
 
-    public boolean isConnected() {
-        return false;
-    }
+    /**
+     * <p>Procedure specific to the given listener type.  This may or may
+     *    not involve access to an application context.</p>
+     *
+     * @param listener of the type handled by this factory (may not be unique).
+     */
+    protected abstract void configureListener(L listener);
 }

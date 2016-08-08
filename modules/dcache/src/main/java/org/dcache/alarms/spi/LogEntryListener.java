@@ -57,36 +57,23 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.webadmin.model.dataaccess.impl;
+package org.dcache.alarms.spi;
 
-import java.util.Collection;
-
-import org.dcache.alarms.dao.AlarmJDOUtils.AlarmDAOFilter;
 import org.dcache.alarms.LogEntry;
-import org.dcache.webadmin.model.dataaccess.LogEntryDAO;
 
 /**
- * For use with the 'off' Spring profile.
- * Should never be called, but just in case,
- * this avoids NPEs.
+ * <p>The provider interface for actions to be taken upon the
+ *    receipt of an alarm.</p>
  *
- * @author arossi
+ * <p>Each listener is provided by a {@link LogEntryListenerFactory}.</p>
  */
-public class NOPAlarmStore implements LogEntryDAO {
-
-    public Collection<LogEntry> get(AlarmDAOFilter filter) {
-        return null;
-    }
-
-    public long remove(Collection<LogEntry> selected) {
-        return 0;
-    }
-
-    public long update(Collection<LogEntry> selected) {
-        return 0;
-    }
-
-    public boolean isConnected() {
-        return false;
-    }
+public interface LogEntryListener {
+    /**
+     * <p>Called when the event, converted into a log entry, is
+     *    discovered to be an alarm.</p>
+     *
+     * @param entry the result of converting an
+     *          {@link ch.qos.logback.classic.spi.ILoggingEvent}.
+     */
+    void handleLogEntry(LogEntry entry);
 }

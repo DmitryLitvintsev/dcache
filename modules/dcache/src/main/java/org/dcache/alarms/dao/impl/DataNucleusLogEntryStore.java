@@ -71,9 +71,9 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import org.dcache.alarms.LogEntry;
 import org.dcache.alarms.dao.AlarmJDOUtils;
 import org.dcache.alarms.dao.AlarmJDOUtils.AlarmDAOFilter;
-import org.dcache.alarms.dao.LogEntry;
 import org.dcache.alarms.dao.LogEntryDAO;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -136,9 +136,9 @@ public final class DataNucleusLogEntryStore implements LogEntryDAO, Runnable {
                 if (dup != null && !dup.isEmpty()) {
                     if (dup.size() > 1) {
                         throw new RuntimeException
-                                ("data store inconsistency!"
-                                 + " more than one alarm with the same id: "
-                                 + entry.getKey());
+                                        ("data store inconsistency!"
+                                                         + " more than one alarm with the same id: "
+                                                         + entry.getKey());
                     }
 
                     LogEntry original = dup.iterator().next();
@@ -174,7 +174,8 @@ public final class DataNucleusLogEntryStore implements LogEntryDAO, Runnable {
                     /*
                      * first instance of this alarm
                      */
-                    logger.trace("makePersistent alarm, key={}", entry.getKey());
+                    logger.trace("makePersistent alarm, key={}",
+                                 entry.getKey());
                     insertManager.makePersistent(entry);
                     logger.trace("committing");
                 }

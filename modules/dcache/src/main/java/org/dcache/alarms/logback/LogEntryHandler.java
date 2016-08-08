@@ -1,4 +1,4 @@
-/*
+  /*
 COPYRIGHT STATUS:
 Dec 1st 2001, Fermi National Accelerator Laboratory (FNAL) documents and
 software are sponsored by the U.S. Department of Energy under Contract No.
@@ -74,28 +74,44 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.ServiceLoader;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.dcache.alarms.AlarmPriority;
 import org.dcache.alarms.AlarmPriorityMap;
-import org.dcache.alarms.dao.LogEntry;
+import org.dcache.alarms.LogEntry;
 import org.dcache.alarms.dao.LogEntryDAO;
+import org.dcache.alarms.spi.LogEntryListener;
+import org.dcache.alarms.spi.LogEntryListenerFactory;
 import org.dcache.util.BoundedCachedExecutor;
 
 /**
- * For server-side interception of log messages. Will store them to the LogEntry
- * store used by the dCache installation. If the storage plugin is file-based
- * (e.g., XML), the dCache alarm web display service must be running over a
- * file-system shared with the logging server.
+ * <p>For server-side interception of log messages.</p>
  *
- * @author arossi
+ * <p>Uses {@link LoggingEventConverter} to transform the event into
+ *    a LogEntry object.  If the object represents an alarm,
+ *    it will be handled for email forwarding and will be processed
+ *    by whatever listeners have been loaded.</p>
+ *
+ * <p>All received events can optionally be written to a history log.</p>
+ *
+ * <p>The logic is encapsulated by a task run by an executor service.
+ *    It is recommended that the queue be bounded (upon
+ *    a rejected execution the event is discarded).</p>
  */
-public class LogEntryHandler {
+public class LogEntryHandler implements ApplicationContextAware {
     private static final Logger LOGGER
         = LoggerFactory.getLogger(LogEntryHandler.class);
 
@@ -124,26 +140,8 @@ public class LogEntryHandler {
                  * If this is a duplicate, the store will increment
                  * the received field.
                  */
-                store.put(entry);
 
-                /*
-                 * Store the alarm.
-                 *
-                 * If this is a duplicate, the store will increment
-                 * the received field.
-                 */
                 store.put(entry);
-
-                /*
-                 * The history log parses out all alerts above a certain
-                 * priority. This is just a convenience for sifting messages
-                 * from the normal domain log and recording them them using the
-                 * more specific alert pattern. We exclude events from the alarm
-                 * service itself.
-                 */
-                if (historyEnabled && priority >= historyThreshold.ordinal()) {
-                    historyAppender.doAppend(event);
-                }
 
                 /*
                  * Post-process if this is a new alarm.
@@ -152,12 +150,30 @@ public class LogEntryHandler {
                     if (emailEnabled && priority >= emailThreshold.ordinal()) {
                         emailAppender.doAppend(event);
                     }
+
+                    for (LogEntryListenerFactory factory: listenerFactories) {
+                        Collection<LogEntryListener> listeners
+                                        = factory.getConfiguredListeners();
+                        listeners.stream().forEach((l) -> l.handleLogEntry(entry));
+                    }
                 }
-            } else if (!storeOnlyAlarms) {
-                store.put(entry);
+            }
+
+            /**
+             *  Optionally save the event to a rolling log file.
+             *  This is largely here for diagnostic purposes.
+             */
+            if (historyEnabled) {
+                historyAppender.doAppend(event);
             }
         }
     }
+
+    /**
+     *  Plugins for handling the converted alarm.
+     */
+    protected final Collection<LogEntryListenerFactory> listenerFactories
+                    = Collections.synchronizedList(new ArrayList<>());
 
     /**
      *  LogEntry converter -- binds logback to the DAO.
@@ -177,7 +193,7 @@ public class LogEntryHandler {
     private Level rootLevel;
 
     /**
-     * The main configuration for storing alarms through DAO.
+     *  Underlying alarms storage.
      */
     private LogEntryDAO store;
 
@@ -223,12 +239,23 @@ public class LogEntryHandler {
     private final AbstractExecutorService executor;
 
     /**
+     * Bean application context
+     */
+    private AutowireCapableBeanFactory beanFactory;
+
+    /**
      * State.
      */
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     public LogEntryHandler(int workers, int maxQueued) {
         executor = new BoundedCachedExecutor(workers, maxQueued);
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext)
+                    throws BeansException {
+        beanFactory = applicationContext.getAutowireCapableBeanFactory();
     }
 
     public void setConverter(LoggingEventConverter converter) {
@@ -340,6 +367,8 @@ public class LogEntryHandler {
 
     public void start() {
         if (!started.getAndSet(true)) {
+            loadListeners();
+
             try {
                 if (emailEnabled) {
                     startEmailAppender();
@@ -383,6 +412,15 @@ public class LogEntryHandler {
             LOGGER.info("{}, discarded: {}.",
                             e.getMessage(),
                             eventObject.getFormattedMessage());
+        }
+    }
+
+    protected void loadListeners() {
+        ServiceLoader<LogEntryListenerFactory> serviceLoader
+                        = ServiceLoader.load(LogEntryListenerFactory.class);
+        for (LogEntryListenerFactory factory: serviceLoader) {
+            LOGGER.info("Loading listener factories of class {}.", factory.getClass());
+            listenerFactories.add(beanFactory.getBean(factory.getClass()));
         }
     }
 
