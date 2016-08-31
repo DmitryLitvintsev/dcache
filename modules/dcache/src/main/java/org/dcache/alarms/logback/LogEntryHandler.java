@@ -127,6 +127,14 @@ public class LogEntryHandler {
                 store.put(entry);
 
                 /*
+                 * Store the alarm.
+                 *
+                 * If this is a duplicate, the store will increment
+                 * the received field.
+                 */
+                store.put(entry);
+
+                /*
                  * The history log parses out all alerts above a certain
                  * priority. This is just a convenience for sifting messages
                  * from the normal domain log and recording them them using the
