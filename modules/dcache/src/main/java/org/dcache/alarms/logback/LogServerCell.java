@@ -86,28 +86,28 @@ public final class LogServerCell extends UniversalSpringCell
     @Override
     public void prepareStartup(StartEvent event) throws Exception
     {
-        MDC.put(AlarmsInternalFilter.ALARMS_INTERNAL, AlarmsInternalFilter.ALARMS_INTERNAL);
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
         super.prepareStartup(event);
     }
 
     @Override
     public void postStartup(StartEvent event)
     {
-        MDC.put(AlarmsInternalFilter.ALARMS_INTERNAL, AlarmsInternalFilter.ALARMS_INTERNAL);
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
         super.postStartup(event);
     }
 
     @Override
-    public void messageArrived(MessageEvent me)
+    public void messageArrived(MessageEvent event)
     {
-        MDC.put(AlarmsInternalFilter.ALARMS_INTERNAL, AlarmsInternalFilter.ALARMS_INTERNAL);
-        super.messageArrived(me);
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
+        super.messageArrived(event);
     }
 
     @Override
-    public void prepareRemoval(KillEvent ce)
+    public void prepareRemoval(KillEvent event)
     {
-        MDC.put(AlarmsInternalFilter.ALARMS_INTERNAL, AlarmsInternalFilter.ALARMS_INTERNAL);
-        super.prepareRemoval(ce);
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
+        super.prepareRemoval(event);
     }
 }

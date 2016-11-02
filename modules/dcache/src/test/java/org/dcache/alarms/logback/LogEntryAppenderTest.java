@@ -171,7 +171,6 @@ public class LogEntryAppenderTest {
             }
         };
         handler.setEmailEnabled(false);
-        handler.setHistoryEnabled(false);
         handler.setRootLevel("ERROR");
         handler.setStore(testStore);
         LoggingEventConverter converter = new LoggingEventConverter();
