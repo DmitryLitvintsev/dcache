@@ -22,6 +22,7 @@ import org.opensciencegrid.authz.xacml.common.XACMLConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.x500.X500Principal;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -37,7 +38,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import javax.security.auth.x500.X500Principal;
 
 import org.dcache.auth.LoginGidPrincipal;
 import org.dcache.auth.LoginNamePrincipal;
@@ -204,11 +204,13 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
             xacmlClient.setResourceX509Issuer(_targetServiceIssuer);
             xacmlClient.setRequestedaction(XACMLConstants.ACTION_ACCESS);
 
+            long start = System.currentTimeMillis();
             LocalId localId = xacmlClient.mapCredentials(_mappingServiceURL);
+            long end = System.currentTimeMillis();
             Preconditions.checkArgument(localId != null, DENIED_MESSAGE + key);
 
-            logger.debug("mapping service {} returned localId {} for {} ",
-                            _mappingServiceURL, localId, key);
+            logger.info("mapping service {} returned localId {} for {}:  call took {} ms",
+                            _mappingServiceURL, localId, key, end-start);
             return localId;
         }
     }
