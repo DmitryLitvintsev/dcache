@@ -61,6 +61,8 @@ package org.dcache.alarms.logback;
 
 import org.slf4j.MDC;
 
+import dmg.cells.nucleus.KillEvent;
+import dmg.cells.nucleus.MessageEvent;
 import org.dcache.cells.UniversalSpringCell;
 
 /**
@@ -70,8 +72,6 @@ import org.dcache.cells.UniversalSpringCell;
  * by resending the event to the cell via the socket appender.
  * Hence a corresponding filter which blocks events with
  * this property should be added to that appender in the logback.xml.
- *
- * @author arossi
  */
 public final class LogServerCell extends UniversalSpringCell {
     public LogServerCell(String cellName, String arguments) {
@@ -79,9 +79,16 @@ public final class LogServerCell extends UniversalSpringCell {
     }
 
     @Override
-    protected void executeInit() throws Exception {
-        MDC.put(AlarmsInternalFilter.ALARMS_INTERNAL,
-                AlarmsInternalFilter.ALARMS_INTERNAL);
-        super.executeInit();
+    public void messageArrived(MessageEvent event)
+    {
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
+        super.messageArrived(event);
+    }
+
+    @Override
+    public void prepareRemoval(KillEvent event)
+    {
+        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
+        super.prepareRemoval(event);
     }
 }
