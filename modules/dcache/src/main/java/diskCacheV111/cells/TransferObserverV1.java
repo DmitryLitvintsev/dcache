@@ -601,10 +601,10 @@ public class TransferObserverV1
                     }
                     page.td("speed", transfer.getTransferRate());
                 }
-                catch (NullPointerException ignore)  {
-                    page.td("transferred", "-");
-                    page.td("speed", 0);
-                }
+            }
+            catch (NullPointerException ignore)  {
+                page.td("transferred", "-");
+                page.td("speed", 0);
             }
         }
         page.endRow();
