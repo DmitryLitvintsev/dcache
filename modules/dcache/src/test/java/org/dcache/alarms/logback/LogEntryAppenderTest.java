@@ -82,6 +82,7 @@ import org.dcache.alarms.file.FileBackedAlarmPriorityMap;
 import org.dcache.alarms.spi.LogEntryListenerFactory;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
 /**
@@ -207,7 +208,7 @@ public class LogEntryAppenderTest {
     public void shouldCreateNonAlarmWhenUndefinedErrorWithNoMarkerIsUsed() {
         String message = givenLoggingMessageWhichMatchesType(null);
         whenMessageIsLogged(null, message, null);
-        assertThat(lastEntry.isAlarm(), is(false));
+        assertNull(lastEntry);
     }
 
     @After
