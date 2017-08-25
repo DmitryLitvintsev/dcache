@@ -64,7 +64,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.dcache.alarms.AlarmPriority;
-import org.dcache.alarms.dao.LogEntry;
+import org.dcache.alarms.LogEntry;
 import org.dcache.webadmin.model.dataaccess.LogEntryDAO;
 
 /**

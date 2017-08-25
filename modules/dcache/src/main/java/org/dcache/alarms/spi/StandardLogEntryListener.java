@@ -57,30 +57,26 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.alarms;
+package org.dcache.alarms.spi;
+
+import java.util.Map;
+
+import org.dcache.alarms.file.FileBackedAlarmPriorityMap;
 
 /**
- * Used mainly during interactive sessions (shell and admin interface)
- * when creating a new definition.
- *
- * @author arossi
+ * <p>Parent of listeners which require no other configuration than
+ * to have a number of configuration properties injected.</p>
  */
-public class AlarmDefinitionValidationException extends Exception
-{
-    private static final long serialVersionUID = -5160138147230131675L;
+public interface StandardLogEntryListener extends LogEntryListener {
+    /**
+     * @param configuration provides the environment from which
+     *                      the listener should autowire its property
+     *                      fields.
+     */
+    void configure(Map<String, String> configuration);
 
-    public AlarmDefinitionValidationException() {
-    }
-
-    public AlarmDefinitionValidationException(String message) {
-        super(message);
-    }
-
-    public AlarmDefinitionValidationException(Throwable cause) {
-        super(cause);
-    }
-
-    public AlarmDefinitionValidationException(String message, Throwable cause) {
-        super(message, cause);
-    }
+    /**
+     * @param priorityMap current alarm prioritization by type.
+     */
+    void setPriorityMap(FileBackedAlarmPriorityMap priorityMap);
 }

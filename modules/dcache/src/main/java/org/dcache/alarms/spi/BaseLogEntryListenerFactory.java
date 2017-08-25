@@ -57,57 +57,49 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.alarms.logback;
+package org.dcache.alarms.spi;
 
-import org.slf4j.MDC;
-
-import dmg.cells.nucleus.KillEvent;
-import dmg.cells.nucleus.MessageEvent;
-import dmg.cells.nucleus.StartEvent;
-
-import org.dcache.cells.UniversalSpringCell;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.ServiceLoader;
 
 /**
- * This wrapper adds an MDC property to the root thread
- * in order to identify logging statements emanating from this
- * cell.  This is necessary in order to avoid cycles caused
- * by resending the event to the cell via the socket appender.
- * Hence a corresponding filter which blocks events with
- * this property should be added to that appender in the logback.xml.
- *
- * @author arossi
+ * <p>Does the basic work of loading and invocation of listeners
+ *    bound to the given factory type.</p>
  */
-public final class LogServerCell extends UniversalSpringCell
-{
-    public LogServerCell(String cellName, String arguments) {
-        super(cellName, arguments);
+public abstract class BaseLogEntryListenerFactory<L extends LogEntryListener>
+                implements LogEntryListenerFactory<L> {
+    private final Collection<L> listeners = Collections.synchronizedList(new ArrayList<>());
+
+    /**
+     * Set from the default constructor of the factory class.
+     */
+    protected final Class<L> clzz;
+
+    protected BaseLogEntryListenerFactory(Class<L> clzz) {
+        this.clzz = clzz;
     }
 
     @Override
-    public void prepareStartup(StartEvent event) throws Exception
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.prepareStartup(event);
+    public Collection<L> getConfiguredListeners() {
+        return listeners;
     }
 
     @Override
-    public void postStartup(StartEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.postStartup(event);
+    public void load() {
+        ServiceLoader<L> serviceLoader = ServiceLoader.load(clzz);
+        for (L listener : serviceLoader) {
+            configureListener(listener);
+            listeners.add(listener);
+        }
     }
 
-    @Override
-    public void messageArrived(MessageEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.messageArrived(event);
-    }
-
-    @Override
-    public void prepareRemoval(KillEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.prepareRemoval(event);
-    }
+    /**
+     * <p>Procedure specific to the given listener type.  This may or may
+     *    not involve access to an application context.</p>
+     *
+     * @param listener of the type handled by this factory (may not be unique).
+     */
+    protected abstract void configureListener(L listener);
 }

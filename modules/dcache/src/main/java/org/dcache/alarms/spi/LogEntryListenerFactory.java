@@ -57,57 +57,32 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.alarms.logback;
+package org.dcache.alarms.spi;
 
-import org.slf4j.MDC;
-
-import dmg.cells.nucleus.KillEvent;
-import dmg.cells.nucleus.MessageEvent;
-import dmg.cells.nucleus.StartEvent;
-
-import org.dcache.cells.UniversalSpringCell;
+import java.util.Collection;
 
 /**
- * This wrapper adds an MDC property to the root thread
- * in order to identify logging statements emanating from this
- * cell.  This is necessary in order to avoid cycles caused
- * by resending the event to the cell via the socket appender.
- * Hence a corresponding filter which blocks events with
- * this property should be added to that appender in the logback.xml.
+ * <p>For each {@link LogEntryListener} there is a factory which
+ *    is responsible for its configuration.</p>
  *
- * @author arossi
+ * <p>The implementations of this factory map the "extension points" inasmuch
+ *    as their generic listener types must all be "exported" by the core
+ *    alarms configuration.  In implementation-specific terms, this
+ *    means that all such factories must appear in the alarms Spring
+ *    application context. The listeners themselves can be defined in the
+ *    META-INF directory of other modules, but their properties are injected
+ *    from this context (via the protected configuration method).</p>
  */
-public final class LogServerCell extends UniversalSpringCell
-{
-    public LogServerCell(String cellName, String arguments) {
-        super(cellName, arguments);
-    }
+public interface LogEntryListenerFactory<L extends LogEntryListener> {
+    /**
+     * @return the configured listeners loaded by the {@link #load()}
+     *    method.
+     */
+    Collection<L> getConfiguredListeners();
 
-    @Override
-    public void prepareStartup(StartEvent event) throws Exception
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.prepareStartup(event);
-    }
-
-    @Override
-    public void postStartup(StartEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.postStartup(event);
-    }
-
-    @Override
-    public void messageArrived(MessageEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.messageArrived(event);
-    }
-
-    @Override
-    public void prepareRemoval(KillEvent event)
-    {
-        MDC.put(AlarmFilter.ALARMS_INTERNAL, AlarmFilter.ALARMS_INTERNAL);
-        super.prepareRemoval(event);
-    }
+    /**
+     *  <p>Responsible for the configuration of the {@LogEntryListener}
+     *     type(s) bound to this factory.</p>
+     */
+    void load();
 }

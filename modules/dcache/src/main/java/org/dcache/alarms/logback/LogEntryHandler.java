@@ -1,4 +1,4 @@
-/*
+  /*
 COPYRIGHT STATUS:
 Dec 1st 2001, Fermi National Accelerator Laboratory (FNAL) documents and
 software are sponsored by the U.S. Department of Energy under Contract No.
@@ -59,43 +59,52 @@ documents or software obtained from this server.
  */
 package org.dcache.alarms.logback;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.PatternLayout;
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.net.SMTPAppender;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.FileAppender;
-import ch.qos.logback.core.rolling.FixedWindowRollingPolicy;
-import ch.qos.logback.core.rolling.RollingFileAppender;
-import ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy;
-import ch.qos.logback.core.spi.CyclicBufferTracker;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+  import ch.qos.logback.classic.Level;
+  import ch.qos.logback.classic.LoggerContext;
+  import ch.qos.logback.classic.PatternLayout;
+  import ch.qos.logback.classic.net.SMTPAppender;
+  import ch.qos.logback.classic.spi.ILoggingEvent;
+  import ch.qos.logback.core.FileAppender;
+  import ch.qos.logback.core.spi.CyclicBufferTracker;
+  import com.google.common.base.Preconditions;
+  import com.google.common.base.Strings;
+  import org.slf4j.Logger;
+  import org.slf4j.LoggerFactory;
+  import org.springframework.beans.BeansException;
+  import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+  import org.springframework.context.ApplicationContext;
+  import org.springframework.context.ApplicationContextAware;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
+  import java.util.ArrayList;
+  import java.util.Collection;
+  import java.util.Collections;
+  import java.util.ServiceLoader;
+  import java.util.concurrent.AbstractExecutorService;
+  import java.util.concurrent.RejectedExecutionException;
+  import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.dcache.alarms.AlarmPriority;
-import org.dcache.alarms.AlarmPriorityMap;
-import org.dcache.alarms.dao.LogEntry;
-import org.dcache.alarms.dao.LogEntryDAO;
-import org.dcache.util.BoundedCachedExecutor;
+  import org.dcache.alarms.AlarmMarkerFactory;
+  import org.dcache.alarms.AlarmPriority;
+  import org.dcache.alarms.AlarmPriorityMap;
+  import org.dcache.alarms.LogEntry;
+  import org.dcache.alarms.dao.LogEntryDAO;
+  import org.dcache.alarms.spi.LogEntryListener;
+  import org.dcache.alarms.spi.LogEntryListenerFactory;
+  import org.dcache.util.BoundedCachedExecutor;
 
 /**
- * For server-side interception of log messages. Will store them to the LogEntry
- * store used by the dCache installation. If the storage plugin is file-based
- * (e.g., XML), the dCache alarm web display service must be running over a
- * file-system shared with the logging server.
+ * <p>For server-side interception of log messages.</p>
  *
- * @author arossi
+ * <p>Uses {@link LoggingEventConverter} to transform the event into
+ *    a LogEntry object.  Only alarms should be received.  These
+ *    will be handled for email forwarding and will be processed
+ *    by whatever listeners have been loaded.</p>
+ *
+ * <p>The logic is encapsulated by a task run by an executor service.
+ *    It is recommended that the queue be bounded (upon
+ *    a rejected execution the event is discarded).</p>
  */
-public class LogEntryHandler {
+public class LogEntryHandler implements ApplicationContextAware {
     private static final Logger LOGGER
         = LoggerFactory.getLogger(LogEntryHandler.class);
 
@@ -112,52 +121,51 @@ public class LogEntryHandler {
         }
 
         public void run() {
+            /**
+             * TODO: remove this eventually.
+             * It is here for backward compatibility between
+             * old clients and the new server.
+             */
+            if (!AlarmMarkerFactory.containsAlarmMarker(event.getMarker())) {
+                return;
+            }
+
             LogEntry entry = converter.createEntryFromEvent(event);
 
-            if (entry.isAlarm()) {
-                int priority = priorityMap.getPriority(entry.getType()).ordinal();
-                event.getMDCPropertyMap().put(MDC_TYPE, entry.getType());
+            int priority = priorityMap.getPriority(
+                            entry.getType()).ordinal();
+            event.getMDCPropertyMap().put(MDC_TYPE, entry.getType());
 
-                /*
-                 * Store the alarm.
-                 *
-                 * If this is a duplicate, the store will increment
-                 * the received field.
-                 */
-                store.put(entry);
+           /*
+            * Store the alarm.
+            *
+            * If this is a duplicate, the store will increment the received field.
+            */
+            store.put(entry);
 
-                /*
-                 * Store the alarm.
-                 *
-                 * If this is a duplicate, the store will increment
-                 * the received field.
-                 */
-                store.put(entry);
-
-                /*
-                 * The history log parses out all alerts above a certain
-                 * priority. This is just a convenience for sifting messages
-                 * from the normal domain log and recording them them using the
-                 * more specific alert pattern. We exclude events from the alarm
-                 * service itself.
-                 */
-                if (historyEnabled && priority >= historyThreshold.ordinal()) {
-                    historyAppender.doAppend(event);
+            /*
+             * Post-process if this is a new alarm.
+             */
+            if (entry.getReceived() == 1) {
+                if (emailEnabled && priority >= emailThreshold.ordinal()) {
+                    emailAppender.doAppend(event);
                 }
 
-                /*
-                 * Post-process if this is a new alarm.
-                 */
-                if (entry.getReceived() == 1) {
-                    if (emailEnabled && priority >= emailThreshold.ordinal()) {
-                        emailAppender.doAppend(event);
-                    }
+                for (LogEntryListenerFactory factory : listenerFactories) {
+                    Collection<LogEntryListener> listeners
+                                    = factory.getConfiguredListeners();
+                    listeners.stream().forEach(
+                                    (l) -> l.handleLogEntry(entry));
                 }
-            } else if (!storeOnlyAlarms) {
-                store.put(entry);
             }
         }
     }
+
+    /**
+     *  Plugins for handling the converted alarm.
+     */
+    protected final Collection<LogEntryListenerFactory> listenerFactories
+                    = Collections.synchronizedList(new ArrayList<>());
 
     /**
      *  LogEntry converter -- binds logback to the DAO.
@@ -177,7 +185,7 @@ public class LogEntryHandler {
     private Level rootLevel;
 
     /**
-     * The main configuration for storing alarms through DAO.
+     *  Underlying alarms storage.
      */
     private LogEntryDAO store;
 
@@ -205,22 +213,14 @@ public class LogEntryHandler {
     private int emailBufferSize;
 
     /**
-     * Optional history file appender configuration.
-     */
-    private FileAppender<ILoggingEvent> historyAppender;
-    private boolean historyEnabled;
-    private AlarmPriority historyThreshold;
-    private String historyEncoding;
-    private String historyFile;
-    private String historyFileNamePattern;
-    private String historyMaxFileSize;
-    private int historyMinIndex;
-    private int historyMaxIndex;
-
-    /**
      * Concurrent handling.
      */
     private final AbstractExecutorService executor;
+
+    /**
+     * Bean application context
+     */
+    private AutowireCapableBeanFactory beanFactory;
 
     /**
      * State.
@@ -229,6 +229,12 @@ public class LogEntryHandler {
 
     public LogEntryHandler(int workers, int maxQueued) {
         executor = new BoundedCachedExecutor(workers, maxQueued);
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext)
+                    throws BeansException {
+        beanFactory = applicationContext.getAutowireCapableBeanFactory();
     }
 
     public void setConverter(LoggingEventConverter converter) {
@@ -273,39 +279,6 @@ public class LogEntryHandler {
         this.emailUser = emailUser;
     }
 
-    public void setHistoryEnabled(boolean historyEnabled) {
-        this.historyEnabled = historyEnabled;
-    }
-
-    public void setHistoryEncoding(String historyEncoding) {
-        this.historyEncoding = historyEncoding;
-    }
-
-    public void setHistoryFile(String historyFile) {
-        this.historyFile = historyFile;
-    }
-
-    public void setHistoryFileNamePattern(String historyFileNamePattern) {
-        this.historyFileNamePattern = historyFileNamePattern;
-    }
-
-    public void setHistoryMaxFileSize(String historyMaxFileSize) {
-        this.historyMaxFileSize = historyMaxFileSize;
-    }
-
-    public void setHistoryMaxIndex(int historyMaxIndex) {
-        this.historyMaxIndex = historyMaxIndex;
-    }
-
-    public void setHistoryMinIndex(int historyMinIndex) {
-        this.historyMinIndex = historyMinIndex;
-    }
-
-    public void setHistoryThreshold(String historyThreshold) {
-        Preconditions.checkNotNull(historyThreshold);
-        this.historyThreshold = AlarmPriority.valueOf(historyThreshold.toUpperCase());
-    }
-
     public void setPriorityMap(AlarmPriorityMap priorityMap) {
         this.priorityMap = priorityMap;
     }
@@ -340,16 +313,10 @@ public class LogEntryHandler {
 
     public void start() {
         if (!started.getAndSet(true)) {
-            try {
-                if (emailEnabled) {
-                    startEmailAppender();
-                }
+            loadListeners();
 
-                if (historyEnabled) {
-                    startHistoryAppender();
-                }
-            } catch (IOException t) {
-                throw new RuntimeException(t);
+            if (emailEnabled) {
+                startEmailAppender();
             }
         }
     }
@@ -359,11 +326,6 @@ public class LogEntryHandler {
             if (emailAppender != null) {
                 emailAppender.stop();
                 emailAppender = null;
-            }
-
-            if (historyAppender != null) {
-                historyAppender.stop();
-                historyAppender = null;
             }
 
             executor.shutdown();
@@ -383,6 +345,15 @@ public class LogEntryHandler {
             LOGGER.info("{}, discarded: {}.",
                             e.getMessage(),
                             eventObject.getFormattedMessage());
+        }
+    }
+
+    protected void loadListeners() {
+        ServiceLoader<LogEntryListenerFactory> serviceLoader
+                        = ServiceLoader.load(LogEntryListenerFactory.class);
+        for (LogEntryListenerFactory factory: serviceLoader) {
+            LOGGER.info("Loading listener factories of class {}.", factory.getClass());
+            listenerFactories.add(beanFactory.getBean(factory.getClass()));
         }
     }
 
@@ -413,38 +384,5 @@ public class LogEntryHandler {
         emailAppender.setLayout(layout);
         emailAppender.setCyclicBufferTracker(bufferTracker);
         emailAppender.start();
-    }
-
-    private void startHistoryAppender() throws FileNotFoundException {
-        LoggerContext context
-            = (LoggerContext) LoggerFactory.getILoggerFactory();
-        PatternLayoutEncoder encoder = new PatternLayoutEncoder();
-        encoder.setPattern(historyEncoding);
-        encoder.setContext(context);
-        encoder.start();
-
-        RollingFileAppender<ILoggingEvent> historyAppender = new RollingFileAppender<>();
-        FixedWindowRollingPolicy fwrp = new FixedWindowRollingPolicy();
-        fwrp.setMaxIndex(historyMaxIndex);
-        fwrp.setMinIndex(historyMinIndex);
-        fwrp.setFileNamePattern(historyFileNamePattern);
-        fwrp.setContext(context);
-
-        SizeBasedTriggeringPolicy sbtp = new SizeBasedTriggeringPolicy();
-        sbtp.setMaxFileSize(historyMaxFileSize);
-        sbtp.setContext(context);
-
-        historyAppender.setContext(context);
-        historyAppender.setEncoder(encoder);
-        historyAppender.setFile(historyFile);
-        historyAppender.setTriggeringPolicy(sbtp);
-        historyAppender.setRollingPolicy(fwrp);
-
-        fwrp.setParent(historyAppender);
-        fwrp.start();
-        sbtp.start();
-        historyAppender.start();
-
-        this.historyAppender = historyAppender;
     }
 }

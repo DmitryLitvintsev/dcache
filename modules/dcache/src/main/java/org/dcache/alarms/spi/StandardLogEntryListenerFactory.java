@@ -57,71 +57,51 @@ export control laws.  Anyone downloading information from this server is
 obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
  */
-package org.dcache.alarms;
+package org.dcache.alarms.spi;
 
-import java.io.Writer;
-import java.util.Collection;
-import java.util.NoSuchElementException;
-import java.util.Properties;
-import java.util.Set;
+import org.springframework.beans.factory.annotation.Required;
+
+import java.util.Map;
+
+import org.dcache.alarms.file.FileBackedAlarmPriorityMap;
 
 /**
- * Defines the component responsible for mapping custom alarm types
- * to their definitions.
+ * <p>Factory for creating and configuring listeners which require
+ * only properties from the environment/configuration map.</p>
  *
- * @author arossi
+ * <p>Included in the injection are the alarm type priorities.</p>
  */
-public interface AlarmDefinitionsMap<T extends AlarmDefinition> {
-
-    String PATH = "alarm-definitions-path";
+public class StandardLogEntryListenerFactory
+                extends BaseLogEntryListenerFactory<StandardLogEntryListener> {
+    /**
+     * <p>Map is injected after being built using
+     * a {@link org.dcache.util.ConfigurationMapFactoryBean}.</p>
+     */
+    private Map<String, String> configuration;
 
     /**
-     * @param definition of custom alarm.
+     * <p>Make available to the listeners the mapping of
+     * alarm type to priority.</p>
      */
-    void add(T definition);
+    private FileBackedAlarmPriorityMap priorityMap;
 
-    /**
-     * @param  type alarm name.
-     * @return definition to which this is mapped.
-     */
-    T getDefinition(String type) throws NoSuchElementException;
+    public StandardLogEntryListenerFactory() {
+        super(StandardLogEntryListener.class);
+    }
 
-    /**
-     * @return copy of the the collection of definitions.
-     */
-    Collection<T> getDefinitions();
+    @Required
+    public void setConfiguration(Map<String, String> configuration) {
+        this.configuration = configuration;
+    }
 
-    /**
-     * @param writer e.g., string or file
-     *  to which to emit sorted string list of the entire alarms definition map.
-     * @throws Exception
-     */
-    void getSortedList(Writer writer) throws Exception;
+    @Required
+    public void setPriorityMap(FileBackedAlarmPriorityMap priorityMap) {
+        this.priorityMap = priorityMap;
+    }
 
-    /**
-     * @return a copy of the set of names of all defined alarm types.
-     */
-    Set<String> getTypes();
-
-    /**
-     * Should locate all external alarm types
-     * and load their definitions.
-     *
-     * @param env any special settings which should override current ones.
-     */
-    void load(Properties env) throws Exception;
-
-    /**
-     * @param alarmType type name.
-     * @return definition removed from the map.
-     */
-    T removeDefinition(String alarmType);
-
-    /**
-     * Should save the current mapping to some form of persistent
-     * storage for future reloading.
-     *
-     * @param env any special settings which should override current ones.
-     */
-    void save(Properties env) throws Exception;
+    @Override
+    protected void configureListener(StandardLogEntryListener listener) {
+        listener.setPriorityMap(priorityMap);
+        listener.configure(configuration);
+    }
 }
