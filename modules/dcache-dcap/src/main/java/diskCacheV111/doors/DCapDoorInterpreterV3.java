@@ -539,7 +539,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
                     _maxClientVersion = new DCapDoorInterpreterV3.Version(values.get(1));
                 }
             } catch (IllegalArgumentException e) {
-                _log.error("Ignoring client version limits: syntax error with '{}': {}", clientVersion, e.getMessage());
+                _log.info("Ignoring client version limits: syntax error with '{}': {}", clientVersion, e.getMessage());
             }
         }
     }
