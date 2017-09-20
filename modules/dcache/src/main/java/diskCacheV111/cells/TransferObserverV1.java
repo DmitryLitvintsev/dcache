@@ -8,7 +8,6 @@ import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.Subject;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.net.InetAddress;
@@ -589,23 +588,12 @@ public class TransferObserverV1
             }
         } else {
             page.td("state", transfer.getMoverStatus());
-            try {
-                if (transfer.getMoverStart() != null) {
-                    page.td("transferred", transfer.getBytesTransferred() / 1024);
-                } else {
-                    page.td("transferred", "-");
-                    if (transfer.getMoverStart() > 0L) {
-                        page.td("transferred", transfer.getBytesTransferred() / 1024);
-                    } else {
-                        page.td("transferred", "-");
-                    }
-                    page.td("speed", transfer.getTransferRate());
-                }
-            }
-            catch (NullPointerException ignore)  {
+            if (transfer.getMoverStart() != null) {
+                page.td("transferred", transfer.getBytesTransferred() / 1024);
+            } else {
                 page.td("transferred", "-");
-                page.td("speed", 0);
             }
+            page.td("speed", transfer.getTransferRate());
         }
         page.endRow();
     }
