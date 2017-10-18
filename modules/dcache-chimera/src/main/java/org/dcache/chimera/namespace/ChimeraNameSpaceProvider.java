@@ -553,15 +553,6 @@ public class ChimeraNameSpaceProvider
                                 throw new PermissionDeniedCacheException("Mv denied: " +
                                                                          dest.getParent() +
                                                                          " has different storage tags; use cp.");
-
-                            if (!(nullToEmpty(destDirAttributes.getStorageClass()).
-                                  equals(nullToEmpty(sourceAttributes.getStorageClass())) &&
-                                  nullToEmpty(destDirAttributes.getCacheClass()).
-                                  equals(nullToEmpty(sourceAttributes.getCacheClass())))) {
-                            throw new PermissionDeniedCacheException("Mv denied: " +
-                                                                   dest.getParent() +
-                                                                   " has different storage tags; use cp.");
-                            }
                             }
                         }
                     }
