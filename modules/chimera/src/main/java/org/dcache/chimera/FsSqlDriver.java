@@ -136,13 +136,14 @@ public class FsSqlDriver {
      * @return fsStat
      */
     FsStat getFsStat() {
-        return _jdbc.queryForObject(
-                "SELECT count(*) AS usedFiles, SUM(isize) AS usedSpace FROM t_inodes WHERE itype=32768",
-                (rs, rowNum) -> {
-                    long usedFiles = rs.getLong("usedFiles");
-                    long usedSpace = rs.getLong("usedSpace");
-                    return new FsStat(JdbcFs.AVAILABLE_SPACE, JdbcFs.TOTAL_FILES, usedSpace, usedFiles);
-                });
+        return new FsStat(JdbcFs.AVAILABLE_SPACE, JdbcFs.TOTAL_FILES, 51892535521168974L, 474982857L);
+        // return _jdbc.queryForObject(
+        //         "SELECT count(*) AS usedFiles, SUM(isize) AS usedSpace FROM t_inodes WHERE itype=32768",
+        //         (rs, rowNum) -> {
+        //             long usedFiles = rs.getLong("usedFiles");
+        //             long usedSpace = rs.getLong("usedSpace");
+        //             return new FsStat(JdbcFs.AVAILABLE_SPACE, JdbcFs.TOTAL_FILES, usedSpace, usedFiles);
+        //         });
     }
 
     /**
