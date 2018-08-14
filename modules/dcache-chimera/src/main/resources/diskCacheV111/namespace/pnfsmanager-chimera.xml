@@ -84,7 +84,7 @@
       <constructor-arg ref="tx-manager"/>
   </bean>
 
-  <bean id="extractor" class="${pnfsmanager.plugins.storage-info-extractor}">
+  <bean id="extractor" class="org.dcache.chimera.namespace.ChimeraEnstoreStorageInfoExtractor">
       <description>Storage info extractor</description>
       <constructor-arg value="#{ T(diskCacheV111.util.AccessLatency).getAccessLatency('${pnfsmanager.default-access-latency}') }"/>
       <constructor-arg value="#{ T(diskCacheV111.util.RetentionPolicy).getRetentionPolicy('${pnfsmanager.default-retention-policy}') }"/>
