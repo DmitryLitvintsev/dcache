@@ -212,7 +212,7 @@ public class DatabaseRequestCredentialStorage implements RequestCredentialStorag
     }
 
     public static final String SELECT_BY_NAME = "SELECT * FROM " + requestCredentialTableName +
-        " WHERE credentialname=? AND role IS null ORDER BY credentialexpiration DESC";
+        " WHERE credentialname=? ORDER BY credentialexpiration DESC";
 
     public static final String SELECT_BY_NAME_AND_ROLE = "SELECT * FROM " + requestCredentialTableName +
         " WHERE credentialname=? AND role=? ORDER BY credentialexpiration DESC";
@@ -313,11 +313,11 @@ public class DatabaseRequestCredentialStorage implements RequestCredentialStorag
     }
 
     private static final String COUNT_ROWS_MATCHING_NAME = "SELECT COUNT(1) FROM " +
-            requestCredentialTableName + " WHERE credentialname=?";
+            requestCredentialTableName + " WHERE credentialname=? and credentialexpiration>?";
 
     private static final String COUNT_ROWS_MATCHING_NAME_AND_ROLE =
             "SELECT COUNT(1) FROM " + requestCredentialTableName +
-            " WHERE credentialname=? AND role=?";
+            " WHERE credentialname=? AND role=? AND credentialexpiration>?";
 
 
     @Override
@@ -325,9 +325,9 @@ public class DatabaseRequestCredentialStorage implements RequestCredentialStorag
             throws IOException
     {
         if (isRoleSpecified(role)) {
-            return queryForInt(COUNT_ROWS_MATCHING_NAME_AND_ROLE, name, role) > 0;
+            return queryForInt(COUNT_ROWS_MATCHING_NAME_AND_ROLE, name, role, System.currentTimeMillis()) > 0;
         } else {
-            return queryForInt(COUNT_ROWS_MATCHING_NAME, name) > 0;
+            return queryForInt(COUNT_ROWS_MATCHING_NAME, name, System.currentTimeMillis()) > 0;
         }
     }
 
