@@ -128,7 +128,6 @@ public class DelegationService implements CellMessageReceiver
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
 
         assertThat(!delegations.has(id), "delegation already started", id);
-        assertThat(credentials.has(id), "no delegated credential", id);
 
         CertPath certPath = getFirst(request.getSubject().getPublicCredentials(CertPath.class), null);
         CredentialDelegation delegation = factory.newDelegation(id, certPath);
