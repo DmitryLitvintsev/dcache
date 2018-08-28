@@ -23,6 +23,8 @@ import com.google.common.base.Charsets;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import org.italiangrid.voms.ac.VOMSACValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
 
 import javax.security.auth.Subject;
@@ -49,6 +51,8 @@ import static org.dcache.gridsite.Utilities.assertThat;
  */
 public class DelegationService implements CellMessageReceiver
 {
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(DelegationService.class);
     private Map<String,String> serviceMetadata;
     private CredentialDelegationStore delegations;
     private CredentialDelegationFactory factory;
@@ -118,6 +122,8 @@ public class DelegationService implements CellMessageReceiver
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
 
         CredentialDelegation delegation = delegations.remove(id);
+
+        LOGGER.error("requestid = {}, id = {}", request.getDelegationID(), id);
 
         credentials.put(id, delegation.acceptCertificate(request.getProxy()), Subjects.getPrimaryFqan(request.getSubject()));
         return new PutProxyResponse();
