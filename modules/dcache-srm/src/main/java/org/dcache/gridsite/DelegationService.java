@@ -86,6 +86,7 @@ public class DelegationService implements CellMessageReceiver
             throws DelegationException
     {
         String value = serviceMetadata.get(request.getKey());
+        LOGGER.debug("GetServiceMetaDataRequest: value = {}", value);
         assertThat(value != null, "unknown key");
         return new GetServiceMetaDataResponse(value);
     }
@@ -93,12 +94,14 @@ public class DelegationService implements CellMessageReceiver
     public GetProxyReqResponse messageArrived(GetProxyReqRequest request) throws DelegationException
     {
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
+        LOGGER.debug("GetProxyReqRequest: id = {}", id);
         return new GetProxyReqResponse(newDelegation(id, request.getSubject()).getCertificateSigningRequest());
     }
 
     public GetNewProxyReqResponse messageArrived(GetNewProxyReqRequest request) throws DelegationException
     {
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), generateDelegationId(request.getSubject()));
+        LOGGER.debug("GetNewProxyReqRequest: id = {}", id);
         return new GetNewProxyReqResponse(newDelegation(id, request.getSubject()).getCertificateSigningRequest(), id.getDelegationId());
     }
 
@@ -109,6 +112,7 @@ public class DelegationService implements CellMessageReceiver
         assertThat(!credentials.has(id), "delegated credential already exists",
                    id);
 
+        LOGGER.debug("newDelegation: id = {}", id);
         CertPath path = getFirst(subject.getPublicCredentials(CertPath.class), null);
         CredentialDelegation delegation = factory.newDelegation(id, path);
 
@@ -123,7 +127,7 @@ public class DelegationService implements CellMessageReceiver
 
         CredentialDelegation delegation = delegations.remove(id);
 
-        LOGGER.error("requestid = {}, id = {}", request.getDelegationID(), id);
+        LOGGER.debug("PutProxyResponse: requestid = {}, id = {}", request.getDelegationID(), id);
 
         credentials.put(id, delegation.acceptCertificate(request.getProxy()), Subjects.getPrimaryFqan(request.getSubject()));
         return new PutProxyResponse();
@@ -132,6 +136,8 @@ public class DelegationService implements CellMessageReceiver
     public RenewProxyReqResponse messageArrived(RenewProxyReqRequest request) throws DelegationException
     {
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
+
+        LOGGER.debug("RenewProxyReqRequest: requestid = {}, id = {}", request.getDelegationID(), id);
 
         assertThat(!delegations.has(id), "delegation already started", id);
 
@@ -146,12 +152,14 @@ public class DelegationService implements CellMessageReceiver
     public GetTerminationTimeResponse messageArrived(GetTerminationTimeRequest request) throws DelegationException
     {
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
+        LOGGER.debug("GetTerminationTimeRequest: requestid = {}, id = {}", request.getDelegationID(), id);
         return new GetTerminationTimeResponse(credentials.getExpiry(id));
     }
 
     public DestroyResponse messageArrived(DestroyRequest request) throws DelegationException
     {
         DelegationIdentity id = new DelegationIdentity(Subjects.getDn(request.getSubject()), request.getDelegationID());
+        LOGGER.debug("DestroyRequest: requestid = {}, id = {}", request.getDelegationID(), id);
         delegations.removeIfPresent(id);
         credentials.remove(id);
         return new DestroyResponse();
