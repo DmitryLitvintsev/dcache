@@ -94,8 +94,11 @@ public class CredentialServiceClient
         for (CellAddressCore address : cache.asMap().keySet()) {
             CellPath path = new CellPath(address);
             SrmRequestCredentialMessage msg = new SrmRequestCredentialMessage(dn, primaryFqan);
+            LOGGER.debug("Sending SrmRequestCredentialMessage {} {} {}", path, dn, primaryFqan);
             try {
                 msg = topic.sendAndWait(path, msg);
+
+                LOGGER.debug("getDelegatedCredential hasCredential {}", msg.hasCredential());
 
                 if (!msg.hasCredential()) {
                     continue;
@@ -116,6 +119,7 @@ public class CredentialServiceClient
             }
         }
 
+        LOGGER.debug("getDelegatedCredential bestCredential {} {}", bestCredential, bestRemainingLifetime < units.toMillis(minimumValidity));
         return bestRemainingLifetime < units.toMillis(minimumValidity) ? null : bestCredential;
     }
 
