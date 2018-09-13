@@ -293,6 +293,7 @@ public class CopyFilter implements Filter
 
         CredentialSource source = getCredentialSource(request, type);
         X509Credential credential = fetchCredential(source);
+        _log.debug("fetchedCredential {}", credential);
         if (credential == null && source != CredentialSource.NONE) {
             redirectWithDelegation(response);
         } else {
@@ -359,6 +360,7 @@ public class CopyFilter implements Filter
 
     private void redirectWithDelegation(Response response)
     {
+        _log.debug("redirectWithDelegation {}", response);
         /* The Request#getParams method looks promising, but does not seem to
          * provide the parameters of the request URI, despite what the JavaDoc
          * says.  Instead, the HttpServletRequest object is used to
