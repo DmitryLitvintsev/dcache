@@ -68,15 +68,15 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.dcache.auth.FQANPrincipal;
-import org.dcache.auth.GidPrincipal;
+import org.dcache.auth.LoginGidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.gplazma.AuthenticationException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * <p>Mapping plugin which requires FQANPrincipal, and adds a GIDPrincioal
- *    and possibly a UserNamePrincipal.</p>
+ * <p>Mapping plugin which requires FQANPrincipal, and adds a LoginGidPrincipal
+ *    and possibly UserNamePrincipal.</p>
  *
  * <p>If there is no FQAN, the plugin fails.  Otherwise it will always
  *    add the mapped GIDPrincipal as primary.</p>
@@ -117,8 +117,7 @@ public class VOGroupPlugin implements GPlazmaMappingPlugin {
 
         VOGroupEntry voGroupEntry = map.get(fqan.getName());
 
-        principals.add(new GidPrincipal(voGroupEntry.getMappedGid(), true));
-
+        principals.add(new LoginGidPrincipal(voGroupEntry.getMappedGid()));
         String mappedUname = voGroupEntry.getMappedUname();
 
         if (Strings.isNullOrEmpty(mappedUname)) {
@@ -131,7 +130,8 @@ public class VOGroupPlugin implements GPlazmaMappingPlugin {
                 i.remove();
             }
         }
-
         principals.add(new UserNamePrincipal(mappedUname));
     }
+
+
 }
