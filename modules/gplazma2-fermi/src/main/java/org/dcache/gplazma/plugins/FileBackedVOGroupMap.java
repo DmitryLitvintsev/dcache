@@ -77,6 +77,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import org.dcache.gplazma.AuthenticationException;
+import org.dcache.util.Glob;
 
 /**
  * <p>In-memory version of the VO Group map file.  Loads once, and thereafter
@@ -99,14 +100,25 @@ public class FileBackedVOGroupMap {
     }
 
     public VOGroupEntry get(String fqan) throws AuthenticationException {
+        VOGroupEntry entry;
         synchronized (cache) {
             checkFile();
-            if (!cache.containsKey(fqan)) {
-                throw new AuthenticationException("No VO group entry matching FQAN: "
-                                                                  + fqan);
-            }
-
-            return cache.get(fqan);
+            entry = cache.get(fqan);
+             if (entry == null) {
+                 for (Map.Entry<String, VOGroupEntry> i : cache.entrySet()) {
+                     Glob glob = new Glob(i.getKey());
+                     if (glob.isGlob() && glob.matches(fqan)) {
+                         entry = i.getValue();
+                         break;
+                     }
+                 }
+             }
+        }
+        if (entry == null) {
+            throw new AuthenticationException("No VO group entry matching FQAN: "
+                                              + fqan);
+        } else {
+            return entry;
         }
     }
 
