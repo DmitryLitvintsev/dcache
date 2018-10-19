@@ -259,7 +259,6 @@ public class TransferInfoServiceImpl extends CellDataCollectingService<Map<Strin
                                   null,
                                   null,
                                   null,
-                                  null,
                                   null);
             List<TransferInfo> snapshot = result.getItems();
 
@@ -348,17 +347,11 @@ public class TransferInfoServiceImpl extends CellDataCollectingService<Map<Strin
         };
     }
 
-    private static Predicate<TransferInfo> getFilter(String subjectUid,
-                                                     String state, String door,
+    private static Predicate<TransferInfo> getFilter(String state, String door,
                                                      String domain, String protocol,
                                                      String uid, String gid,
                                                      String vomsgroup, String pnfsid,
                                                      String pool, String client) {
-        Predicate<TransferInfo> matchesSubject =
-                        (info) -> subjectUid == null
-                                        || Strings.emptyToNull(info.getUid()) == null  // allow all users to see anonymous transfers
-                                        || info.getUid().equals(subjectUid);
-
         Predicate<TransferInfo> matchesState =
                         (info) -> state == null || Strings.nullToEmpty(info.getMoverStatus())
                                                           .contains(state);
@@ -390,10 +383,10 @@ public class TransferInfoServiceImpl extends CellDataCollectingService<Map<Strin
                         (info) -> client == null || Strings.nullToEmpty(info.getReplyHost())
                                                           .contains(client);
 
-        return matchesSubject.and(matchesState).and(matchesDoor)
-                             .and(matchesDomain).and(matchesProtocol)
-                             .and(matchesUid).and(matchesGid).and(matchesVomsGroup)
-                             .and(matchesPnfsid).and(matchesPool).and(matchesClient);
+        return matchesState.and(matchesDoor)
+                           .and(matchesDomain).and(matchesProtocol)
+                           .and(matchesUid).and(matchesGid).and(matchesVomsGroup)
+                           .and(matchesPnfsid).and(matchesPool).and(matchesClient);
     }
 
     /**
@@ -417,7 +410,6 @@ public class TransferInfoServiceImpl extends CellDataCollectingService<Map<Strin
     public SnapshotList<TransferInfo> get(UUID token,
                                           Integer offset,
                                           Integer limit,
-                                          String suid,
                                           String state,
                                           String door,
                                           String domain,
@@ -429,8 +421,7 @@ public class TransferInfoServiceImpl extends CellDataCollectingService<Map<Strin
                                           String pool,
                                           String client,
                                           String sort) throws CacheException {
-        Predicate<TransferInfo> filter = getFilter(suid,
-                                                   state, door, domain, protocol,
+        Predicate<TransferInfo> filter = getFilter(state, door, domain, protocol,
                                                    uid, gid, vomsgroup,
                                                    pnfsid, pool, client);
         if (Strings.isNullOrEmpty(sort)) {
