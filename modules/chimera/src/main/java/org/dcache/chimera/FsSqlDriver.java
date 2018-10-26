@@ -1199,7 +1199,7 @@ public class FsSqlDriver {
             assignTagToDir(tagId, tagName, inode, true);
 
             // decrease reference on old tag
-            decTagNlinkOrRemove(tagStat.getIno());
+            // decTagNlinkOrRemove(tagStat.getIno());
         } else {
             tagId = getTagId(inode, tagName);
         }
