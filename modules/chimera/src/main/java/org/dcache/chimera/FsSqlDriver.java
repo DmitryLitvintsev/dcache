@@ -1252,16 +1252,58 @@ public class FsSqlDriver {
     void removeTag(FsInode dir, String tag) {
         long tagId = getTagId(dir, tag);
         int n = _jdbc.update("DELETE FROM t_tags WHERE inumber=? AND itagname=?", dir.ino(), tag);
-        if (n > 0) {
-            decTagNlinkOrRemove(tagId);
-        }
+        // if (n > 0) {
+        //     decTagNlinkOrRemove(tagId);
+        // }
     }
 
     void removeTag(FsInode dir) {
         /* Get the name of the tags to be removed.
          */
-        _jdbc.queryForList("SELECT itagname FROM t_tags WHERE inumber=?", String.class, dir.ino())
-                .forEach(tag -> removeTag(dir, tag));
+        // _jdbc.queryForList("SELECT itagname FROM t_tags WHERE inumber=?", String.class, dir.ino())
+        //         .forEach(tag -> removeTag(dir, tag));
+
+        List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
+                List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
+        if (!ids.isEmpty()) {
+            /* Remove the links.
+             */
+            _jdbc.update("DELETE FROM t_tags WHERE inumber=?", dir.ino());
+
+            /* Remove any tag inode of of the tag links removed above, which are
+             * not referenced by any other links either.
+             *
+             * We ought to maintain the link count in the inode, but Chimera has
+             * not done so in the past. In the interest of avoiding costly schema
+             * corrections in patch level releases, the current solution queries
+             * for the existence of other links instead.
+             *
+             * The statement below relies on concurrent transactions not deleting
+             * other links to affected tag inodes. Otherwise we could come into a
+             * situation in which two concurrent transactions remove two links to
+             * the same inode, yet none of them realize that the inode is left
+             * without links (as there is another link).
+             *
+             * One way to ensure this would be to use repeatable read transaction
+             * isolation, but PostgreSQL doesn't support changing the isolation level
+             * in the middle of a transaction. Always running any operation that
+             * might call this method with repeatable read was deemed unacceptable.
+             * Another solution would be to lock the tag inode at the beginning of
+             * this method using SELECT FOR UPDATE. This would be fairly expensive
+             * way of solving this race.
+             *
+             * For now we decide to ignore the race: It seems unlikely to run into
+             * and even if one does, the consequence is merely an orphaned inode.
+             */
+            _jdbc.batchUpdate("DELETE FROM t_tags_inodes i WHERE itagid=? " +
+                              "AND NOT EXISTS (SELECT 1 FROM t_tags WHERE itagid=?)",
+                              ids, ids.size(),
+                              (ps, tagid) -> {
+                                  ps.setLong(1, tagid);
+                                  ps.setLong(2, tagid);
+                              });
+        }
+
     }
 
     /**
@@ -1369,10 +1411,10 @@ public class FsSqlDriver {
     void copyTags(FsInode orign, FsInode destination) {
         int n = _jdbc.update("INSERT INTO t_tags (inumber,itagid,isorign,itagname) (SELECT ?,itagid,0,itagname from t_tags WHERE inumber=?)",
                      destination.ino(), orign.ino());
-        if (n > 0) {
-            // if tags was copied, then bump the reference counts.
-            _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + 1 WHERE itagid IN (SELECT itagid from t_tags where inumber=?)", destination.ino());
-        }
+        // if (n > 0) {
+        //     // if tags was copied, then bump the reference counts.
+        //     _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + 1 WHERE itagid IN (SELECT itagid from t_tags where inumber=?)", destination.ino());
+        // }
     }
 
     void setTagOwner(FsInode_TAG tagInode, int newOwner) throws FileNotFoundHimeraFsException {
