@@ -297,24 +297,40 @@ public class PgSQLFsSqlDriver extends FsSqlDriver {
 
     @Override
     void copyTags(FsInode orign, FsInode destination) {
-        _jdbc.queryForList("INSERT INTO t_tags (inumber,itagid,isorign,itagname) (SELECT ?,itagid,0,itagname FROM t_tags WHERE inumber=?) RETURNING itagid",
-                Long.class, destination.ino(), orign.ino()).
-                forEach(tagId -> {
-                    _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + 1 WHERE itagid=?", tagId);
-                });
+        int n = _jdbc.update("INSERT INTO t_tags (inumber,itagid,isorign,itagname) (SELECT ?,itagid,0,itagname from t_tags WHERE inumber=?)",
+                             destination.ino(), orign.ino());
+        // _jdbc.queryForList("INSERT INTO t_tags (inumber,itagid,isorign,itagname) (SELECT ?,itagid,0,itagname FROM t_tags WHERE inumber=?) RETURNING itagid",
+        //         Long.class, destination.ino(), orign.ino()).
+                // forEach(tagId -> {
+                //     _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + 1 WHERE itagid=?", tagId);
+                // });
     }
 
     @Override
     void removeTag(FsInode dir) {
-        _jdbc.queryForList("DELETE FROM t_tags WHERE inumber=? RETURNING itagid", Long.class, dir.ino())
-                .forEach(tagId -> {
-                    // shortcut: delete right away, if there is only one reference left
-                    int n = _jdbc.update("DELETE FROM t_tags_inodes WHERE itagid=? AND inlink = 1", tagId);
-                    // if delete didn't happen, then just indicate that one reference in gone
-                    if (n == 0) {
-                        _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink - 1 WHERE itagid=?", tagId);
-                    }
-                });
+
+        List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
+        if (!ids.isEmpty()) {
+            _jdbc.update("DELETE FROM t_tags WHERE inumber=?", dir.ino());
+            _jdbc.batchUpdate("DELETE FROM t_tags_inodes i WHERE itagid=? " +
+                              "AND NOT EXISTS (SELECT 1 FROM t_tags WHERE itagid=?)",
+                              ids, ids.size(),
+                              (ps, tagid) -> {
+                                  ps.setLong(1, tagid);
+                                  ps.setLong(2, tagid);
+                              });
+        }
+
+
+        // _jdbc.queryForList("DELETE FROM t_tags WHERE inumber=? RETURNING itagid", Long.class, dir.ino())
+        //         .forEach(tagId -> {
+        //             // shortcut: delete right away, if there is only one reference left
+        //             int n = _jdbc.update("DELETE FROM t_tags_inodes WHERE itagid=? AND inlink = 1", tagId);
+        //             // if delete didn't happen, then just indicate that one reference in gone
+        //             // if (n == 0) {
+        //             //     _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink - 1 WHERE itagid=?", tagId);
+        //             // }
+        //         });
     }
 
     @Override
@@ -328,13 +344,13 @@ public class PgSQLFsSqlDriver extends FsSqlDriver {
                 (ResultSet rs) ->  rs.next() ? rs.getLong("itagid") : null);
 
         // TODO: explore a possibility to perform DELETE+UPDATE with single query
-        if (tagId != null) {
-            // shortcut: delete right away, if there is only one reference left
-            int n = _jdbc.update("DELETE FROM t_tags_inodes WHERE itagid=? AND inlink = 1", tagId);
-            // if delete didn't happen, then just indicate that one reference in gone
-            if (n == 0) {
-                _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink - 1 WHERE itagid=?", tagId);
-            }
-        }
+        // if (tagId != null) {
+        //     // shortcut: delete right away, if there is only one reference left
+        //     int n = _jdbc.update("DELETE FROM t_tags_inodes WHERE itagid=? AND inlink = 1", tagId);
+        //     // if delete didn't happen, then just indicate that one reference in gone
+        //     if (n == 0) {
+        //         _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink - 1 WHERE itagid=?", tagId);
+        //     }
+        // }
     }
 }

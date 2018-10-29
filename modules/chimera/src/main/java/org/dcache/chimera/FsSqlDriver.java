@@ -1205,7 +1205,7 @@ public class FsSqlDriver {
         }
     }
     void removeTag(FsInode dir, String tag) {
-        long tagId = getTagId(dir, tag);
+        //long tagId = getTagId(dir, tag);
         int n = _jdbc.update("DELETE FROM t_tags WHERE inumber=? AND itagname=?", dir.ino(), tag);
         // if (n > 0) {
         //     decTagNlinkOrRemove(tagId);
@@ -1217,9 +1217,7 @@ public class FsSqlDriver {
          */
         // _jdbc.queryForList("SELECT itagname FROM t_tags WHERE inumber=?", String.class, dir.ino())
         //         .forEach(tag -> removeTag(dir, tag));
-
         List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
-                List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
         if (!ids.isEmpty()) {
             /* Remove the links.
              */
