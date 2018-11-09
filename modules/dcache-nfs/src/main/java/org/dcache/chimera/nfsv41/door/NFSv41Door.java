@@ -189,7 +189,7 @@ public class NFSv41Door extends AbstractCellComponent implements
      * Given that the timeout is pretty short, the retry period has to
      * be rather small too.
      */
-    private static final long NFS_RETRY_PERIOD = 500; // In millis
+    private static final long NFS_RETRY_PERIOD = 500 * 20; // In millis
 
     /**
      * How long stage request can hang around. As the tape system can be broken,
