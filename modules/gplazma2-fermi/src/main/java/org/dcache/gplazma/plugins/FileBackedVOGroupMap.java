@@ -68,6 +68,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.concurrent.GuardedBy;
 import org.dcache.gplazma.AuthenticationException;
@@ -86,10 +87,11 @@ public class FileBackedVOGroupMap {
 
     private final Map<String, VOGroupEntry> cache = new HashMap<>();
     /**
-     * the vo group map file may contain wildcard FQAN match patterns, allow second cache for these
-     * for efficiency
+     * the vo group map file may contain wildcard FQAN match patterns,
+     * allow second cache for these for efficiency. LinkedHashMap preserves
+     * insertion order.
      */
-    private final Map<Glob, VOGroupEntry> globCache = new HashMap<>();
+    private final Map<Glob, VOGroupEntry> globCache = new LinkedHashMap<>();
     private final File file;
     private final Path path;
     private long lastModified;
