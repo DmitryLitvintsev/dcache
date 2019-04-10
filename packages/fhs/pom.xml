@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.dcache</groupId>
         <artifactId>packaging</artifactId>
-        <version>4.2.32-SNAPSHOT</version>
+        <version>4.2.32-FNAL</version>
     </parent>
 
     <artifactId>dcache-fhs</artifactId>
@@ -156,7 +156,7 @@
                                 <configuration>
                                     <name>rpm.version</name>
                                     <value>${project.version}</value>
-                                    <regex>-SNAPSHOT</regex>
+                                    <regex>-FNAL</regex>
                                     <replacement>.\${git.commit.id.abbrev}</replacement>
                                     <failIfNoMatch>false</failIfNoMatch>
                                 </configuration>
@@ -263,7 +263,7 @@
                                 <configuration>
                                     <name>deb.version</name>
                                     <value>${project.version}</value>
-                                    <regex>-SNAPSHOT</regex>
+                                    <regex>-FNAL</regex>
                                     <replacement>~\${git.commit.id.describe}</replacement>
                                     <failIfNoMatch>false</failIfNoMatch>
                                 </configuration>
