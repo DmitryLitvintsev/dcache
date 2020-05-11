@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.security.auth.Subject;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.sse.OutboundSseEvent;
@@ -54,6 +55,7 @@ import java.util.function.BiFunction;
 
 import org.dcache.auth.Subjects;
 import org.dcache.restful.events.spi.EventStream;
+import org.dcache.restful.events.spi.SelectionContext;
 import org.dcache.restful.events.spi.SelectionResult;
 import org.dcache.restful.events.spi.SelectionStatus;
 import org.dcache.restful.util.CloseableWithTasks;
@@ -381,12 +383,25 @@ public class Channel extends CloseableWithTasks
         }
     }
 
-    public SubscriptionResult subscribe(String channelId, String eventType, JsonNode selector)
+    public SubscriptionResult subscribe(final HttpServletRequest request,
+            final String channelId, String eventType, JsonNode selector)
     {
         EventStream es = repository.getEventStream(eventType)
                     .orElseThrow(() -> new BadRequestException("Unknown event type: " + eventType));
 
-        SelectionResult result = es.select(channelId,
+        SelectionContext context = new SelectionContext() {
+            @Override
+            public String channelId() {
+                return channelId;
+            }
+
+            @Override
+            public HttpServletRequest httpServletRequest() {
+                return request;
+            }
+        };
+
+        SelectionResult result = es.select(context,
                 (id,event) -> {
                             try {
                                 sendEvent(eventType, id, event);

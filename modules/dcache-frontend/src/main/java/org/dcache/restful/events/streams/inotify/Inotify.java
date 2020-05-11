@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
 
 import javax.annotation.concurrent.GuardedBy;
+import javax.inject.Inject;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -71,8 +72,10 @@ import org.dcache.namespace.events.InotifyEvent;
 import org.dcache.namespace.events.EventType;
 import org.dcache.events.NotificationMessage;
 import org.dcache.events.SystemEvent;
+import org.dcache.http.PathMapper;
 import org.dcache.restful.events.spi.EventStream;
 import org.dcache.restful.events.spi.SelectedEventStream;
+import org.dcache.restful.events.spi.SelectionContext;
 import org.dcache.restful.events.spi.SelectionResult;
 import org.dcache.restful.util.RequestUser;
 import org.dcache.vehicles.FileAttributes;
@@ -134,6 +137,7 @@ public class Inotify implements EventStream, CellMessageReceiver,
             if (selector.flags().contains(AddWatchFlag.IN_MASK_ADD)) {
                 InotifySelector combinedSelector = new InotifySelector();
                 combinedSelector.setPath(selector.getPath());
+                combinedSelector.setFsPath(selector.getFsPath());
 
                 EnumSet<AddWatchFlag> newFlags = EnumSet.copyOf(selector.flags());
                 newFlags.addAll(this.selector.flags());
@@ -249,6 +253,9 @@ public class Inotify implements EventStream, CellMessageReceiver,
     private CuratorFramework curator;
     private String subscriptionPath;
     private PersistentNode subscriptions;
+
+    @Inject
+    private PathMapper pathMapper;
 
     @Override
     public void setCuratorFramework(CuratorFramework client)
@@ -398,13 +405,20 @@ public class Inotify implements EventStream, CellMessageReceiver,
     }
 
     @Override
-    public SelectionResult select(String channelId, BiConsumer<String,JsonNode> receiver,
+    public SelectionResult select(SelectionContext context, BiConsumer<String,JsonNode> receiver,
             JsonNode serialisedSelector)
     {
         try {
             InotifySelector selector = mapper.readerFor(InotifySelector.class)
                     .readValue(serialisedSelector);
-            return selector.validationError().orElseGet(() -> select(channelId, receiver, selector));
+            String clientPath = selector.getPath();
+            FsPath dCachePath = pathMapper.asDcachePath(context.httpServletRequest(),
+                    clientPath, PermissionDeniedCacheException::new);
+            selector.setFsPath(dCachePath);
+            return selector.validationError().orElseGet(() ->
+                    select(context.channelId(), receiver, selector));
+        } catch (PermissionDeniedCacheException e) {
+            return SelectionResult.permissionDenied(e.getMessage());
         } catch (JsonMappingException e) {
             int index = e.getMessage().indexOf('\n');
             String msg = index == -1 ? e.getMessage() : e.getMessage().substring(0, index);
