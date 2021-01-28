@@ -18,22 +18,21 @@
 package org.dcache.xrootd.pool;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import diskCacheV111.util.CacheException;
+import dmg.cells.nucleus.CellCommandListener;
+import dmg.cells.nucleus.CellPath;
+import dmg.util.command.Argument;
+import dmg.util.command.Command;
+import dmg.util.command.Option;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Required;
-
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
-import javax.annotation.Resource;
-
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.channels.CompletionHandler;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,15 +41,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-
-import diskCacheV111.util.CacheException;
-
-import dmg.cells.nucleus.CellCommandListener;
-import dmg.cells.nucleus.CellPath;
-import dmg.util.command.Argument;
-import dmg.util.command.Command;
-import dmg.util.command.Option;
-
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
 import org.dcache.pool.movers.NettyMover;
 import org.dcache.pool.movers.NettyTransferService;
 import org.dcache.util.CDCThreadFactory;
@@ -64,6 +57,9 @@ import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.security.SigningPolicy;
 import org.dcache.xrootd.stream.ChunkedResponseWriteHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Required;
 
 /**
  * xrootd transfer service.
@@ -172,6 +168,18 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
                         .setNameFormat("xrootd-tpc-client-%d")
                         .build();
         thirdPartyClientGroup = new NioEventLoopGroup(0, new CDCThreadFactory(factory));
+    }
+
+    @Override
+    public void closeMover(NettyMover<XrootdProtocolInfo> mover,
+        CompletionHandler<Void, Void> completionHandler) {
+        LOGGER.info("closeMover ({}) (protocol {}) (UUID {}) (path {}) (error {}).",
+            mover,
+            mover.getProtocolInfo(),
+            mover.getUuid(),
+            mover.getTransferPath(),
+            mover.getErrorMessage());
+        super.closeMover(mover, completionHandler);
     }
 
     @Required

@@ -18,12 +18,17 @@
 package org.dcache.xrootd.door;
 
 import com.google.common.net.InetAddresses;
+import diskCacheV111.util.CacheException;
+import diskCacheV111.util.FileExistsCacheException;
+import diskCacheV111.util.FileIsNewCacheException;
+import diskCacheV111.util.FileNotFoundCacheException;
+import diskCacheV111.util.FsPath;
+import diskCacheV111.util.NotFileCacheException;
+import diskCacheV111.util.PermissionDeniedCacheException;
+import diskCacheV111.util.TimeoutCacheException;
+import dmg.cells.nucleus.CellPath;
 import io.netty.channel.ChannelHandlerContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.security.auth.Subject;
-
+import io.netty.channel.ChannelId;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -35,18 +40,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-
-import diskCacheV111.util.CacheException;
-import diskCacheV111.util.FileExistsCacheException;
-import diskCacheV111.util.FileIsNewCacheException;
-import diskCacheV111.util.FileNotFoundCacheException;
-import diskCacheV111.util.FsPath;
-import diskCacheV111.util.NotFileCacheException;
-import diskCacheV111.util.PermissionDeniedCacheException;
-import diskCacheV111.util.TimeoutCacheException;
-
-import dmg.cells.nucleus.CellPath;
-
+import javax.security.auth.Subject;
 import org.dcache.auth.LoginReply;
 import org.dcache.auth.Subjects;
 import org.dcache.auth.attributes.LoginAttributes;
@@ -60,8 +54,9 @@ import org.dcache.util.list.DirectoryEntry;
 import org.dcache.vehicles.PnfsListDirectoryMessage;
 import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.core.XrootdSession;
+import org.dcache.xrootd.core.XrootdSessionIdentifier;
 import org.dcache.xrootd.protocol.XrootdProtocol;
-import org.dcache.xrootd.protocol.XrootdProtocol.*;
+import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
 import org.dcache.xrootd.protocol.messages.AwaitAsyncResponse;
 import org.dcache.xrootd.protocol.messages.CloseRequest;
 import org.dcache.xrootd.protocol.messages.DirListRequest;
@@ -87,10 +82,41 @@ import org.dcache.xrootd.util.ChecksumInfo;
 import org.dcache.xrootd.util.FileStatus;
 import org.dcache.xrootd.util.OpaqueStringParser;
 import org.dcache.xrootd.util.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.dcache.xrootd.CacheExceptionMapper.xrootdErrorCode;
 import static org.dcache.xrootd.CacheExceptionMapper.xrootdException;
-import static org.dcache.xrootd.protocol.XrootdProtocol.*;
+import static org.dcache.xrootd.protocol.XrootdProtocol.UUID_PREFIX;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ArgMissing;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_FileNotOpen;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_InvalidRequest;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_NotAuthorized;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Qcksum;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Qconfig;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ServerError;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_async;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_compress;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_delete;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_force;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_gr;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_gw;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_gx;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_mkpath;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_new;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_open_apnd;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_open_read;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_open_updt;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_or;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ow;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ox;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_posc;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_readable;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_refresh;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_retstat;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ur;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_uw;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ux;
 
 /**
  * Channel handler which redirects all open requests to a pool.
@@ -204,6 +230,8 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
 
         InetSocketAddress localAddress = getDestinationAddress();
         InetSocketAddress remoteAddress = getSourceAddress();
+        XrootdSessionIdentifier sessionId = req.getSession().getSessionIdentifier();
+        ChannelId channelId = ctx.channel().id();
 
         Map<String,String> opaque;
 
@@ -216,8 +244,8 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
                 opaque = new HashMap<>();
             }
         } catch (ParseException e) {
-            _log.warn("Ignoring malformed open opaque {}: {}", req.getOpaque(),
-                      e.getMessage());
+            _log.warn("(Channel {} Session {}): Ignoring malformed open opaque {}: {}",
+                channelId, sessionId,  req.getOpaque(), e.getMessage());
             opaque = new HashMap<>();
         }
 
@@ -235,7 +263,8 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
 
             FilePerm neededPerm = req.getRequiredPermission();
 
-            _log.info("Opening {} for {}", req.getPath(), neededPerm.xmlText());
+            _log.info("(Channel {} Session {}): Opening {} for {}",
+                channelId, sessionId, req.getPath(), neededPerm.xmlText());
             if (_log.isDebugEnabled()) {
                 logDebugOnOpen(req);
             }
@@ -252,6 +281,8 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
                 _log.warn("Ignoring malformed oss.asize: {}",
                           exception.getMessage());
             }
+
+            _log.info("(Channel {} Session {}): OPAQUE : {}", channelId, sessionId, opaque);
 
             UUID uuid = UUID.randomUUID();
             opaque.put(UUID_PREFIX, uuid.toString());
@@ -764,6 +795,8 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
         case kXR_Qconfig:
             StringBuilder s = new StringBuilder();
             for (String name: msg.getArgs().split(" ")) {
+                _log.info("(Channel {}, Session: {}): query request kXR_Qconfig, {}.",
+                    ctx.channel().id(), msg.getSession().getSessionIdentifier(), name);
                 switch (name) {
                 case "bind_max":
                     s.append(0);
