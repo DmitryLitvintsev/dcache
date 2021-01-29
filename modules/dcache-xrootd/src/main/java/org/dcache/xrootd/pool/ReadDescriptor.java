@@ -1,5 +1,8 @@
 package org.dcache.xrootd.pool;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -15,10 +18,12 @@ import org.dcache.xrootd.util.ByteBuffersProvider;
  */
 public class ReadDescriptor implements FileDescriptor
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ReadDescriptor.class);
+
     /**
      * Update mover meta-information
      */
-    protected NettyTransferService<XrootdProtocolInfo>.NettyMoverChannel _channel;
+    protected            NettyTransferService<XrootdProtocolInfo>.NettyMoverChannel _channel;
 
     public ReadDescriptor(NettyTransferService<XrootdProtocolInfo>.NettyMoverChannel channel)
     {
@@ -28,13 +33,20 @@ public class ReadDescriptor implements FileDescriptor
     @Override
     public void read(ByteBuffer buffer, long position) throws IOException
     {
-        while (buffer.hasRemaining()) {
-            /* use position independent thread safe call */
-            int bytes = _channel.read(buffer, position);
-            if (bytes < 0) {
-                break;
+        try {
+            while (buffer.hasRemaining()) {
+                /* use position independent thread safe call */
+                int bytes = _channel.read(buffer, position);
+                if (bytes < 0) {
+                    break;
+                }
+                position += bytes;
             }
-            position += bytes;
+        } catch (RuntimeException | IOException e) {
+            Throwable t = e.getCause();
+            LOGGER.error("Intercepting error thrown during buffer read: {}; cause {}.",
+                e.getMessage(), t == null ? "none" : t.getMessage());
+            throw e;
         }
     }
 
