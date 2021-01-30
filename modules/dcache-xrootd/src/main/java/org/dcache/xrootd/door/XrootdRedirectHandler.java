@@ -216,8 +216,9 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
                 opaque = new HashMap<>();
             }
         } catch (ParseException e) {
-            _log.warn("Ignoring malformed open opaque {}: {}", req.getOpaque(),
-                      e.getMessage());
+            handleLoggingForSessionInfo(ctx, req, _log,
+                                        "Ignoring malformed open opaque {}: {}",
+                                        req.getOpaque(), e.getMessage());
             opaque = new HashMap<>();
         }
 
@@ -234,8 +235,10 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
             }
 
             FilePerm neededPerm = req.getRequiredPermission();
+            handleLoggingForSessionInfo(ctx, req, _log,
+                                        "Opening {} for {}",
+                                        req.getPath(), neededPerm.xmlText());
 
-            _log.info("Opening {} for {}", req.getPath(), neededPerm.xmlText());
             if (_log.isDebugEnabled()) {
                 logDebugOnOpen(req);
             }
@@ -252,6 +255,9 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
                 _log.warn("Ignoring malformed oss.asize: {}",
                           exception.getMessage());
             }
+
+            handleLoggingForSessionInfo(ctx, req, _log,
+                                        "OPAQUE : {}", opaque);
 
             UUID uuid = UUID.randomUUID();
             opaque.put(UUID_PREFIX, uuid.toString());
@@ -764,6 +770,9 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
         case kXR_Qconfig:
             StringBuilder s = new StringBuilder();
             for (String name: msg.getArgs().split(" ")) {
+                handleLoggingForSessionInfo(ctx, msg, _log,
+                                            "query request kXR_Qconfig, {}.",
+                                            name);
                 switch (name) {
                 case "bind_max":
                     s.append(0);

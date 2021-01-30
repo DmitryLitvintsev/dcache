@@ -188,11 +188,16 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                 if (descriptor.isPersistOnSuccessfulClose()) {
                     descriptor.getChannel().release(new FileCorruptedCacheException(
                             "File was opened with Persist On Successful Close and not closed."));
+                    _log.info("Channel {}, channelInactive, File was opened with Persist On Successful Close and not closed; releasing channel.",
+                        ctx.channel());
                 } else if (descriptor.getChannel().getIoMode().contains(StandardOpenOption.WRITE)) {
                     descriptor.getChannel().release(new CacheException(
                             "Client disconnected without closing file."));
+                    _log.info("Channel {}, channelInactive, Client disconnected without closing file; releasing channel.",
+                        ctx.channel());
                 } else {
                     descriptor.getChannel().release();
+                    _log.info("Channel {}, channelInactive; releasing channel.", ctx.channel());
                 }
             }
         }
@@ -202,7 +207,10 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable t)
     {
         if (t instanceof ClosedChannelException) {
-            _log.info("Connection {} unexpectedly closed.", ctx.channel());
+            Throwable c = t.getCause();
+            _log.info("Channel {} unexpectedly closed {}: {}",
+                      ctx.channel(), t.getMessage(),
+                      c == null ? "cause not reported": c.getMessage());
         } else if (t instanceof Exception) {
             for (FileDescriptor descriptor : _descriptors) {
                 if (descriptor != null) {
@@ -213,6 +221,9 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                     } else {
                         descriptor.getChannel().release(t);
                     }
+
+                    _log.info("Channel {}, execptionCaught {}, releasing channel.",
+                        ctx.channel(), t.getMessage());
 
                     if (descriptor instanceof TpcWriteDescriptor) {
                         ((TpcWriteDescriptor)descriptor).fireDelayedSync(kXR_error,
@@ -236,10 +247,11 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
         /*
          * It is only necessary to tell the client to observe the unix protocol
          * if security is on and signed hashes are being enforced.
-         *
          * We also need to swap the decoder.
          */
         String sec;
+
+        handleLoggingForSessionInfo(ctx, msg, _log,"login.");
 
         if (signingPolicy.isSigningOn() && signingPolicy.isForceSigning()) {
             sec = "&P=unix";
@@ -284,8 +296,11 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
         try {
             Map<String, String> opaqueMap = getOpaqueMap(msg.getOpaque());
             UUID uuid = getUuid(opaqueMap);
+
             if (uuid == null) {
-                _log.info("Request to open {} contains no UUID.", msg.getPath());
+                handleLoggingForSessionInfo(ctx, msg, _log,
+                                            "Request to open {} contains no UUID.",
+                                            msg.getPath());
                 throw new XrootdException(kXR_NotAuthorized, "Request lacks the "
                                 + UUID_PREFIX + " property.");
             }
@@ -293,7 +308,9 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
             NettyTransferService<XrootdProtocolInfo>.NettyMoverChannel file
                             = _server.openFile(uuid, false);
             if (file == null) {
-                _log.info("No mover found for {} with UUID {}.", msg.getPath(), uuid);
+                handleLoggingForSessionInfo(ctx, msg, _log,
+                                            "No mover found for {} with UUID {}.",
+                                            msg.getPath(), uuid);
                 return redirectToDoor(ctx, msg, () ->
                 {
                     throw new XrootdException(kXR_NotAuthorized, UUID_PREFIX
@@ -313,7 +330,7 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                                     file.getProtocolInfo().getFlags()
                                         .contains(XrootdProtocolInfo.Flags.POSC);
                     if (opaqueMap.containsKey("tpc.src")) {
-                        _log.debug("Request to open {} is as third-party destination.", msg);
+                        _log.debug("Request to open {} is as third-party destination.", msg);
 
                         XrootdTpcInfo tpcInfo = new XrootdTpcInfo(opaqueMap);
                         tpcInfo.setDelegatedProxy(file.getProtocolInfo().getDelegatedCredential());
@@ -655,6 +672,9 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     {
         int fd = msg.getFileHandle();
 
+        handleLoggingForSessionInfo(ctx, msg, _log,
+                                    "received request to close {}.", fd);
+
         if (!isValidFileDescriptor(fd)) {
             _log.warn("Could not find file descriptor for handle {}", fd);
             throw new XrootdException(kXR_FileNotOpen,
@@ -694,6 +714,9 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
         case kXR_Qconfig:
             StringBuilder s = new StringBuilder();
             for (String name: msg.getArgs().split(" ")) {
+                handleLoggingForSessionInfo(ctx, msg, _log,
+                                            "query request kXR_Qconfig, {}.",
+                                            name);
                 switch (name) {
                 case "bind_max":
                     s.append(0);
