@@ -245,6 +245,7 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             @Override
             public void channelInactive(ChannelHandlerContext ctx) throws Exception
             {
+                LOGGER.info("Channel {}, channelInactive.", ctx.channel());
                 super.channelInactive(ctx);
                 openChannels.remove(ctx.channel());
                 conditionallyStopServer();

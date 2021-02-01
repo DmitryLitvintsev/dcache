@@ -178,6 +178,7 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     public void channelInactive(ChannelHandlerContext ctx)
             throws Exception
     {
+        _log.info("Channel {}, channelInactive.", ctx.channel());
         /* close leftover descriptors */
         for (FileDescriptor descriptor : _descriptors) {
             if (descriptor != null) {
@@ -206,6 +207,7 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable t)
     {
+        _log.info("Channel {}, exceptionCaught: {}", ctx.channel(), t.toString());
         if (t instanceof ClosedChannelException) {
             Throwable c = t.getCause();
             _log.info("Channel {} unexpectedly closed {}: {}",
