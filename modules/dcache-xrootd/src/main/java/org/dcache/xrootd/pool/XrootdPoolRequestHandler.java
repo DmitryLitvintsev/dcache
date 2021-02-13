@@ -18,15 +18,15 @@
 package org.dcache.xrootd.pool;
 
 import com.google.common.base.Throwables;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
+import diskCacheV111.util.CacheException;
+import diskCacheV111.util.FileCorruptedCacheException;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -37,13 +37,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-
-import diskCacheV111.util.CacheException;
-import diskCacheV111.util.FileCorruptedCacheException;
-
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.movers.NettyTransferService;
+import org.dcache.pool.movers.NettyTransferService.NettyMoverChannel;
 import org.dcache.pool.repository.OutOfDiskException;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.util.Version;
@@ -87,8 +85,25 @@ import org.dcache.xrootd.util.ChecksumInfo;
 import org.dcache.xrootd.util.FileStatus;
 import org.dcache.xrootd.util.OpaqueStringParser;
 import org.dcache.xrootd.util.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static org.dcache.xrootd.protocol.XrootdProtocol.*;
+import static org.dcache.xrootd.protocol.XrootdProtocol.UUID_PREFIX;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ArgInvalid;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ArgMissing;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ArgTooLong;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_FileNotOpen;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_IOError;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_NoSpace;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_NotAuthorized;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_NotFile;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Qcksum;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Qconfig;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ServerError;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Unsupported;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_error;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_login;
+import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_posc;
 
 /**
  * XrootdPoolRequestHandler is an xrootd request processor on the pool
@@ -116,6 +131,11 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     private static final int READV_IOV_MAX = (MAX_JAVA_ARRAY - READV_HEADER_LENGTH) / READV_ELEMENT_LENGTH;
 
     /**
+     * SessionId to channel map. See the explanation under the #doOnEndsession method.
+     */
+    private final ConcurrentMap<String, NettyMoverChannel> SESSION_TO_MOVER = Maps.newConcurrentMap();
+
+    /**
      * Store file descriptors of open files.
      */
     private final List<FileDescriptor> _descriptors =
@@ -126,11 +146,18 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
      * the Netty ChannelPipeline, so okay to store stateful information.
      */
     private boolean _hasOpenedFiles;
+
     /**
      * Address of the door. Enables us to redirect the client back if an
      * operation should better be performed at the door.
      */
     private InetSocketAddress _redirectingDoor;
+
+    /**
+     * The session associated with the channel whose pipeline this handler has been added.
+     * See the explanation under the #doOnEndsession method.
+     */
+    private XrootdSessionIdentifier sessionId;
 
     /**
      * The server on which this request handler is running.
@@ -170,13 +197,8 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
         }
     }
 
-    /**
-     * @throws IOException closing the server socket that handles the
-     *                     connection fails
-     */
     @Override
     public void channelInactive(ChannelHandlerContext ctx)
-            throws Exception
     {
         _log.info("Channel {}, channelInactive.", ctx.channel());
         /* close leftover descriptors */
@@ -196,7 +218,16 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                             "Client disconnected without closing file."));
                     _log.info("Channel {}, channelInactive, Client disconnected without closing file; releasing channel.",
                         ctx.channel());
-                } else {
+                } else if (!descriptor.getChannel().getIoMode().contains(StandardOpenOption.READ)) {
+                    /*
+                     *  Because IO stall during a read may trigger the xrootd client
+                     *  to attempt, after a timeout, to reconnect by opening another socket,
+                     *  we would like not to reject it on the basis of a missing mover.  Thus in the
+                     *  case that the file descriptor maps to a READ mover channel, we leave the
+                     *  mover in the map held by the transfer service.  There is little danger of
+                     *  leaking movers this way because the JobTimeoutManager will eventually
+                     *  remove the leftover mover channel after its own timeout.
+                     */
                     descriptor.getChannel().release();
                     _log.info("Channel {}, channelInactive; releasing channel.", ctx.channel());
                 }
@@ -220,7 +251,15 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                         descriptor.getChannel().release(new FileCorruptedCacheException(
                                 "File was opened with Persist On Successful Close and client was disconnected due to an error: " +
                                 t.getMessage(), t));
-                    } else {
+                    } else if (!(descriptor.getChannel().getIoMode().contains(StandardOpenOption.READ)
+                                 && t instanceof IOException)) {
+                        /*
+                         *  Analogously to the exclusion of READ channels in the
+                         *  channelInactive method (see explanation above).
+                         *
+                         *  Here we limit the exclusion to an actual instance of IOException on READ
+                         *  (the stall could present itself eventually as a broken pipe exception).
+                         */
                         descriptor.getChannel().release(t);
                     }
 
@@ -245,7 +284,8 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     @Override
     protected XrootdResponse<LoginRequest> doOnLogin(ChannelHandlerContext ctx, LoginRequest msg)
     {
-        XrootdSessionIdentifier sessionId = new XrootdSessionIdentifier();
+        sessionId = new XrootdSessionIdentifier();
+
         /*
          * It is only necessary to tell the client to observe the unix protocol
          * if security is on and signed hashes are being enforced.
@@ -319,6 +359,11 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                                     + " is no longer valid.");
                 });
             }
+
+            /*
+             *  See the remarks under end session.
+             */
+            SESSION_TO_MOVER.put(sessionId.toString(), file);
 
             try {
                 FileDescriptor descriptor;
@@ -684,6 +729,11 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                              "open file.");
         }
 
+        /*
+         *  See the remarks under end session.
+         */
+        SESSION_TO_MOVER.remove(sessionId.toString());
+
         ListenableFuture<Void> future = _descriptors.get(fd).getChannel().release();
         future.addListener(() -> {
             try {
@@ -780,6 +830,38 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     @Override
     protected Object doOnEndSession(ChannelHandlerContext ctx, EndSessionRequest request) throws XrootdException
     {
+        /*
+         *  While there is currently no provision in the dCache xroot implementation of
+         *  for the concurrent reuse of of the same mover channel for file reads on
+         *  separate sockets (i.e., chunked reading from different offsets are all done
+         *  on the same socket/channel), the mover is nevertheless opened as non-exclusive.
+         *
+         *  What this legacy choice implies is that the xroot mover could potentially be reused
+         *  while open, and in fact we provide for this on READs by not releasing the mover
+         *  should one of the channels using it go inactive or catch an IOException.
+         *
+         *  Since for dCache xrootd (unlike HTTP), multiple sockets using the same mover thus
+         *  denotes a fail/retry or timeout/retry attempt, the client will have considered
+         *  the preceding attempt null and will send an end session request after opening
+         *  a new socket.  It will also not request close on the first socket, for obvious
+         *  reasons.
+         *
+         *  In order to respect the MoverChannel 'open' semantics (count) where each open
+         *  must be followed by a release before the channel can be closed, we thus need
+         *  to access and decrement the open count on the shared channel on both end session
+         *  and close (release).  In order to do so, we need to maintain a map of session
+         *  id to mover, and remove the mapping on both doOnClose and doOnEndSession.
+         *
+         *  Note that the end session request can be sent on a different channel from
+         *  the one originally mapped to the session identifier.  This is why we need
+         *  a map and cannot simply store the mover in the handler itself.
+         */
+        XrootdSessionIdentifier requestedSession = request.getSessionId();
+        NettyMoverChannel channel = SESSION_TO_MOVER.remove(requestedSession.toString());
+        if (channel != null) {
+            channel.release();
+        }
+
         return withOk(request);
     }
 
