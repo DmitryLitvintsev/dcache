@@ -556,6 +556,15 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             }
         }
 
+        public ListenableFuture<Void> releaseAll()
+        {
+            try (CDC ignored = cdc.restore()) {
+                sync.resetOpen();
+                completionHandler.completed(null, null);
+            }
+            return closeFuture;
+        }
+
         public void done()
         {
             closeFuture.set(null);
@@ -606,6 +615,10 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             synchronized boolean onFailure() {
                 open--;
                 return close();
+            }
+
+            synchronized void resetOpen() {
+                open = 0;
             }
 
             synchronized boolean onCancel()

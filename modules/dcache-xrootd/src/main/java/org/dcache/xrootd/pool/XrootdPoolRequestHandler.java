@@ -18,7 +18,6 @@
 package org.dcache.xrootd.pool;
 
 import com.google.common.base.Throwables;
-import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -37,11 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.movers.NettyTransferService;
-import org.dcache.pool.movers.NettyTransferService.NettyMoverChannel;
 import org.dcache.pool.repository.OutOfDiskException;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.util.Version;
@@ -102,7 +99,6 @@ import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Qconfig;
 import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_ServerError;
 import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_Unsupported;
 import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_error;
-import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_login;
 import static org.dcache.xrootd.protocol.XrootdProtocol.kXR_posc;
 
 /**
@@ -131,11 +127,6 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     private static final int READV_IOV_MAX = (MAX_JAVA_ARRAY - READV_HEADER_LENGTH) / READV_ELEMENT_LENGTH;
 
     /**
-     * SessionId to channel map. See the explanation under the #doOnEndsession method.
-     */
-    private final ConcurrentMap<String, NettyMoverChannel> SESSION_TO_MOVER = Maps.newConcurrentMap();
-
-    /**
      * Store file descriptors of open files.
      */
     private final List<FileDescriptor> _descriptors =
@@ -152,12 +143,6 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
      * operation should better be performed at the door.
      */
     private InetSocketAddress _redirectingDoor;
-
-    /**
-     * The session associated with the channel whose pipeline this handler has been added.
-     * See the explanation under the #doOnEndsession method.
-     */
-    private XrootdSessionIdentifier sessionId;
 
     /**
      * The server on which this request handler is running.
@@ -284,7 +269,7 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     @Override
     protected XrootdResponse<LoginRequest> doOnLogin(ChannelHandlerContext ctx, LoginRequest msg)
     {
-        sessionId = new XrootdSessionIdentifier();
+        XrootdSessionIdentifier sessionId = new XrootdSessionIdentifier();
 
         /*
          * It is only necessary to tell the client to observe the unix protocol
@@ -359,11 +344,6 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
                                     + " is no longer valid.");
                 });
             }
-
-            /*
-             *  See the remarks under end session.
-             */
-            SESSION_TO_MOVER.put(sessionId.toString(), file);
 
             try {
                 FileDescriptor descriptor;
@@ -730,11 +710,33 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
         }
 
         /*
-         *  See the remarks under end session.
+         *  While there is currently no provision in the dCache xroot implementation
+         *  for the concurrent use of the same mover channel for file reads on
+         *  separate sockets (i.e., chunked reading from different offsets are all done
+         *  on the same socket/channel, and each new open at the door is mapped to a new
+         *  mover), the mover is nevertheless opened here on the pool in non-exclusive mode.
+         *
+         *  What this legacy choice implies is that the xroot mover could potentially be reused
+         *  while open, and in fact we wish to provide for this on READs by not releasing the mover
+         *  should one of the channels using it go inactive or catch an IOException.
+         *
+         *  Since for dCache xrootd (unlike HTTP), multiple sockets using the same mover thus
+         *  denotes a fail/retry or timeout/retry attempt, the client will have considered
+         *  the preceding attempt null and will send an end session request after logging in on
+         *  a new socket.  It will also not request close on the first socket, for obvious
+         *  reasons.
+         *
+         *  The behavior of the xrootd client thus poses a problem.  If we were to map movers to
+         *  session ids and then release them when the client sends the end session request,
+         *  this would still risk closing the mover and removing it from the uuid map before
+         *  the new open request has a chance to increment the mover's reference count.
+         *
+         *  One solution would be implement a "releaseNoClose" semantics on the mover, and use
+         *  that in the channelInactive and exceptionCaught methods; but that choice still
+         *  seems subject to timing issues and is not reliable. The alternative adopted here
+         *  is to implement a forcible close by releasing all references to the mover.
          */
-        SESSION_TO_MOVER.remove(sessionId.toString());
-
-        ListenableFuture<Void> future = _descriptors.get(fd).getChannel().release();
+        ListenableFuture<Void> future = _descriptors.get(fd).getChannel().releaseAll();
         future.addListener(() -> {
             try {
                 Uninterruptibles.getUninterruptibly(future);
@@ -830,38 +832,6 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
     @Override
     protected Object doOnEndSession(ChannelHandlerContext ctx, EndSessionRequest request) throws XrootdException
     {
-        /*
-         *  While there is currently no provision in the dCache xroot implementation of
-         *  for the concurrent reuse of of the same mover channel for file reads on
-         *  separate sockets (i.e., chunked reading from different offsets are all done
-         *  on the same socket/channel), the mover is nevertheless opened as non-exclusive.
-         *
-         *  What this legacy choice implies is that the xroot mover could potentially be reused
-         *  while open, and in fact we provide for this on READs by not releasing the mover
-         *  should one of the channels using it go inactive or catch an IOException.
-         *
-         *  Since for dCache xrootd (unlike HTTP), multiple sockets using the same mover thus
-         *  denotes a fail/retry or timeout/retry attempt, the client will have considered
-         *  the preceding attempt null and will send an end session request after opening
-         *  a new socket.  It will also not request close on the first socket, for obvious
-         *  reasons.
-         *
-         *  In order to respect the MoverChannel 'open' semantics (count) where each open
-         *  must be followed by a release before the channel can be closed, we thus need
-         *  to access and decrement the open count on the shared channel on both end session
-         *  and close (release).  In order to do so, we need to maintain a map of session
-         *  id to mover, and remove the mapping on both doOnClose and doOnEndSession.
-         *
-         *  Note that the end session request can be sent on a different channel from
-         *  the one originally mapped to the session identifier.  This is why we need
-         *  a map and cannot simply store the mover in the handler itself.
-         */
-        XrootdSessionIdentifier requestedSession = request.getSessionId();
-        NettyMoverChannel channel = SESSION_TO_MOVER.remove(requestedSession.toString());
-        if (channel != null) {
-            channel.release();
-        }
-
         return withOk(request);
     }
 
