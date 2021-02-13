@@ -558,11 +558,8 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
 
         public ListenableFuture<Void> releaseAll()
         {
-            try (CDC ignored = cdc.restore()) {
-                sync.resetOpen();
-                completionHandler.completed(null, null);
-            }
-            return closeFuture;
+            sync.resetOpen();
+            return release();
         }
 
         public void done()
