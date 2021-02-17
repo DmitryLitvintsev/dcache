@@ -556,6 +556,12 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             }
         }
 
+        public ListenableFuture<Void> releaseAll()
+        {
+            sync.resetOpen();
+            return release();
+        }
+
         public void done()
         {
             closeFuture.set(null);
@@ -606,6 +612,10 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             synchronized boolean onFailure() {
                 open--;
                 return close();
+            }
+
+            synchronized void resetOpen() {
+                open = 0;
             }
 
             synchronized boolean onCancel()
