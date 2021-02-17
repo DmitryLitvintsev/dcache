@@ -17,6 +17,7 @@
  */
 package org.dcache.xrootd;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,8 @@ import org.dcache.util.Checksum;
 import org.dcache.util.Checksums;
 import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.core.XrootdRequestHandler;
+import org.dcache.xrootd.core.XrootdSession;
+import org.dcache.xrootd.core.XrootdSessionIdentifier;
 import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.protocol.messages.LocateRequest;
 import org.dcache.xrootd.protocol.messages.LocateResponse;
@@ -37,6 +40,7 @@ import org.dcache.xrootd.protocol.messages.QueryRequest;
 import org.dcache.xrootd.protocol.messages.QueryResponse;
 import org.dcache.xrootd.protocol.messages.SetRequest;
 import org.dcache.xrootd.protocol.messages.SetResponse;
+import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.dcache.xrootd.protocol.messages.XrootdResponse;
 import org.dcache.xrootd.security.SigningPolicy;
 import org.dcache.xrootd.util.ChecksumInfo;
@@ -125,4 +129,21 @@ public class AbstractXrootdRequestHandler extends XrootdRequestHandler
                         + "for this file.");
     }
 
+    // REVISIT DEBUGGING CODE
+    protected void handleLoggingForSessionInfo(ChannelHandlerContext ctx,
+                                               XrootdRequest request,
+                                               Logger logger,
+                                               String format,
+                                               Object ... args) {
+        Channel channel = ctx.channel();
+        XrootdSession session = request.getSession();
+        XrootdSessionIdentifier sessionId = null;
+
+        if (session != null) {
+            sessionId = session.getSessionIdentifier();
+        }
+
+        logger.info("Channel {}, Session {}: " + format,
+                    channel, sessionId, args);
+    }
 }

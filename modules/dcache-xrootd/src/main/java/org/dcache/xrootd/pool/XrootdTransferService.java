@@ -34,6 +34,7 @@ import javax.annotation.Resource;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.channels.CompletionHandler;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -172,6 +173,18 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
                         .setNameFormat("xrootd-tpc-client-%d")
                         .build();
         thirdPartyClientGroup = new NioEventLoopGroup(0, new CDCThreadFactory(factory));
+    }
+
+    @Override
+    public void closeMover(NettyMover<XrootdProtocolInfo> mover,
+        CompletionHandler<Void, Void> completionHandler) {
+        LOGGER.info("closeMover ({}) (protocol {}) (UUID {}) (path {}) (error {}).",
+            mover,
+            mover.getProtocolInfo(),
+            mover.getUuid(),
+            mover.getTransferPath(),
+            mover.getErrorMessage());
+        super.closeMover(mover, completionHandler);
     }
 
     @Required
