@@ -369,10 +369,14 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
             public void execute()
                     throws Exception
             {
+                UUID uuid = mover.getUuid();
                 NettyMoverChannel channel =
-                        autoclose(new NettyMoverChannel(mover.open(), connectTimeoutUnit.toMillis(connectTimeout), this,
-                                mover::addChecksumType, mover::addExpectedChecksum));
-                if (uuids.putIfAbsent(mover.getUuid(), channel) != null) {
+                        autoclose(new NettyMoverChannel(uuid,
+                                                        mover.open(),
+                                                        connectTimeoutUnit.toMillis(connectTimeout), this,
+                                                        mover::addChecksumType,
+                                                        mover::addExpectedChecksum));
+                if (uuids.putIfAbsent(uuid, channel) != null) {
                     throw new IllegalStateException("UUID conflict");
                 }
                 conditionallyStartServer();
@@ -449,14 +453,17 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
         private final SettableFuture<Void> closeFuture = SettableFuture.create();
         private final Consumer<ChecksumType> checksumCalculation;
         private final Consumer<Checksum> integrityChecker;
+        private final UUID moverUuid;
 
-        public NettyMoverChannel(MoverChannel<P> file,
+        public NettyMoverChannel(UUID moverUuid,
+                                 MoverChannel<P> file,
                                  long connectTimeout,
                                  CompletionHandler<Void, Void> completionHandler,
                                  Consumer<ChecksumType> checksumCalculation,
                                  Consumer<Checksum> integrityChecker)
         {
             super(file);
+            this.moverUuid = moverUuid;
             this.completionHandler = completionHandler;
             this.checksumCalculation = checksumCalculation;
             this.integrityChecker = integrityChecker;
@@ -481,6 +488,11 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
         public void addChecksum(Checksum value)
         {
             integrityChecker.accept(value);
+        }
+
+        public UUID getMoverUuid()
+        {
+            return moverUuid;
         }
 
         @Override

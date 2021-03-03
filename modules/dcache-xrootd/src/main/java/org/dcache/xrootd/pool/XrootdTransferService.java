@@ -35,9 +35,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.channels.CompletionHandler;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
@@ -145,6 +148,9 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
     private SigningPolicy               signingPolicy;
     private long                        tpcServerResponseTimeout;
     private TimeUnit                    tpcServerResponseTimeoutUnit;
+    private Map<String, Timer>          reconnectTimers;
+    private long                        readReconnectTimeout;
+    private TimeUnit                    readReconnectTimeoutUnit;
 
     public XrootdTransferService()
     {
@@ -173,6 +179,7 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
                         .setNameFormat("xrootd-tpc-client-%d")
                         .build();
         thirdPartyClientGroup = new NioEventLoopGroup(0, new CDCThreadFactory(factory));
+        reconnectTimers = new HashMap<>();
     }
 
     @Override
@@ -191,6 +198,42 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
     public void setAccessLogPlugins(List<ChannelHandlerFactory> plugins)
     {
         this.accessLogPlugins = plugins;
+    }
+
+    public synchronized void cancelReconnectTimeoutForMover(UUID uuid)
+    {
+        Timer timer = reconnectTimers.remove(uuid.toString());
+        if (timer != null) {
+            timer.cancel();
+        }
+    }
+
+    public synchronized void setReconnectTimeoutForMover(FileDescriptor descriptor)
+    {
+        NettyMoverChannel channel = descriptor.getChannel();
+        UUID key = channel.getMoverUuid();
+        cancelReconnectTimeoutForMover(key);
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                channel.releaseAll();
+            }
+        };
+        reconnectTimers.put(key.toString(), timer);
+        timer.schedule(task, readReconnectTimeoutUnit.toMillis(readReconnectTimeout));
+    }
+
+    @Required
+    public void setReadReconnectTimeout(long readReconnectTimeout)
+    {
+        this.readReconnectTimeout = readReconnectTimeout;
+    }
+
+    @Required
+    public void setReadReconnectTimeoutUnit(TimeUnit readReconnectTimeoutUnit)
+    {
+        this.readReconnectTimeoutUnit = readReconnectTimeoutUnit;
     }
 
     @Required
