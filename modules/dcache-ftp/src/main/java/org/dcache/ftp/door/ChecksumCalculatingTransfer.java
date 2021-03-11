@@ -61,6 +61,9 @@ public class ChecksumCalculatingTransfer extends Transfer
         portRange.bind(ssc.socket());
         setAdditionalAttributes(EnumSet.of(FileAttribute.CHECKSUM));
         readNameSpaceEntry(false);
+        if (getFileAttributes().getChecksums().isEmpty()) {
+            throw new CacheException("No checksums found.");
+        }
         LOGGER.debug("calculating checksum using port {}", ssc.getLocalAddress());
         setProtocolInfo(new GFtpProtocolInfo("GFtp", 1, 0,
                 (InetSocketAddress) ssc.getLocalAddress(), 1, 1, 1,
