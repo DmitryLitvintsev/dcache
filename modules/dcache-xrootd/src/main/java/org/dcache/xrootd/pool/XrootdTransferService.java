@@ -218,6 +218,7 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
             @Override
             public void run() {
                 channel.releaseAll();
+                removeReadReconnectTimer(key);
             }
         };
         reconnectTimers.put(key.toString(), timer);
@@ -381,5 +382,10 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private synchronized void removeReadReconnectTimer(UUID key)
+    {
+        reconnectTimers.remove(key.toString());
     }
 }
