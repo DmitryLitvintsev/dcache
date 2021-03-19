@@ -205,6 +205,8 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
         Timer timer = reconnectTimers.remove(uuid.toString());
         if (timer != null) {
             timer.cancel();
+            LOGGER.info("cancelReconnectTimeoutForMover, "
+                                        + "timer cancelled for {}.", uuid);
         }
     }
 
@@ -217,8 +219,16 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
-                channel.releaseAll();
+                /*
+                 *  REVISIT. Current analysis suggests this should be release(),
+                 *           not releaseAll().
+                 */
+//                channel.releaseAll();
+                channel.release();
                 removeReadReconnectTimer(key);
+                timer.cancel();
+                LOGGER.info("reconnect timer expired for {}; "
+                            + "channel was released and timer cancelled.", key);
             }
         };
         reconnectTimers.put(key.toString(), timer);

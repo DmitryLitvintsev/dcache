@@ -343,6 +343,8 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
              *  Stop any timer in case this is a reconnect.
              */
             _server.cancelReconnectTimeoutForMover(uuid);
+            _log.info("doOnOpen, called cancel on reconnect timers for {}",
+                      uuid);
 
             try {
                 FileDescriptor descriptor;
@@ -738,7 +740,17 @@ public class XrootdPoolRequestHandler extends AbstractXrootdRequestHandler
          *  The alternative adopted here is to implement a forcible close by releasing
          *  all references to the mover.
          */
-        ListenableFuture<Void> future = _descriptors.get(fd).getChannel().releaseAll();
+        NettyTransferService<XrootdProtocolInfo>.NettyMoverChannel channel
+                        = _descriptors.get(fd).getChannel();
+
+        /*
+         *  Stop any timer in case this is a reconnect.
+         */
+        _server.cancelReconnectTimeoutForMover(channel.getMoverUuid());
+        _log.info("doOnClose, called cancel on reconnect timers for {}",
+                  channel.getMoverUuid());
+
+        ListenableFuture<Void> future = channel.releaseAll();
         future.addListener(() -> {
             try {
                 Uninterruptibles.getUninterruptibly(future);
