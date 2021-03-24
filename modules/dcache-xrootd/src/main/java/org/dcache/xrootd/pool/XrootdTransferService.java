@@ -215,24 +215,32 @@ public class XrootdTransferService extends NettyTransferService<XrootdProtocolIn
         NettyMoverChannel channel = descriptor.getChannel();
         UUID key = channel.getMoverUuid();
         cancelReconnectTimeoutForMover(key);
-        Timer timer = new Timer();
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                /*
-                 *  REVISIT. Current analysis suggests this should be release(),
-                 *           not releaseAll().
-                 */
-//                channel.releaseAll();
-                channel.release();
-                removeReadReconnectTimer(key);
-                timer.cancel();
-                LOGGER.info("reconnect timer expired for {}; "
-                            + "channel was released and timer cancelled.", key);
-            }
-        };
-        reconnectTimers.put(key.toString(), timer);
-        timer.schedule(task, readReconnectTimeoutUnit.toMillis(readReconnectTimeout));
+        if (uuids.containsKey(key)) {
+            Timer timer = new Timer();
+            TimerTask task = new TimerTask() {
+                @Override
+                public void run() {
+                    /*
+                     *  REVISIT. Current analysis suggests this should be release(),
+                     *           not releaseAll().
+                     */
+                    //                channel.releaseAll();
+                    channel.release();
+                    removeReadReconnectTimer(key);
+                    timer.cancel();
+                    LOGGER.info("reconnect timer expired for {}; "
+                                                + "channel was released and timer cancelled.",
+                                key);
+                }
+            };
+            reconnectTimers.put(key.toString(), timer);
+            timer.schedule(task, readReconnectTimeoutUnit.toMillis(
+                            readReconnectTimeout));
+        } else {
+            LOGGER.info("setReconnectTimeoutForMover for {}; "
+                                        + "mover no longer accessible; skipping.",
+                        key);
+        }
     }
 
     @Required
