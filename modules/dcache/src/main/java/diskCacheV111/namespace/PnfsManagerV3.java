@@ -2662,4 +2662,11 @@ public class PnfsManagerV3
             throw new PermissionDeniedCacheException("Restriction " + restriction + " denied activity " + activity + " on " + path);
         }
     }
+
+    /**
+     * This function to be run periodically to update FS stat cache
+     */
+    public void updateFsStat() throws CacheException {
+        _nameSpaceProvider.updateFsStat();
+    }
 }

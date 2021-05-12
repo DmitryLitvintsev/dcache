@@ -1,9 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:jee="http://www.springframework.org/schema/jee"
        xmlns:context="http://www.springframework.org/schema/context"
-       xsi:schemaLocation="http://www.springframework.org/schema/beans
-           http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+       xmlns:task="http://www.springframework.org/schema/task"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/jee
+                        http://www.springframework.org/schema/jee/spring-jee.xsd
+                        http://www.springframework.org/schema/beans
+                        http://www.springframework.org/schema/beans/spring-beans.xsd
+                        http://www.springframework.org/schema/context
+                        http://www.springframework.org/schema/context/spring-context.xsd
+                        http://www.springframework.org/schema/task
+                        http://www.springframework.org/schema/task/spring-task.xsd
+                        http://www.springframework.org/schema/util
+                        http://www.springframework.org/schema/util/spring-util.xsd">
 
     <context:property-placeholder/>
     <context:annotation-config/>
@@ -119,6 +130,15 @@
       <property name="nameSpaceProvider" ref="name-space-provider"/>
   </bean>
 
+  <task:scheduler id="fs-stat-scheduler" pool-size="1"/>
+
+  <task:scheduled-tasks scheduler="fs-stat-scheduler">
+    <task:scheduled ref="name-space-provider" method="updateFsStat"
+                    initial-delay="100000"
+                    fixed-delay="#{ T(java.util.concurrent.TimeUnit).${pnfsmanager.fs-stat-cache.time.unit}.toMillis(${pnfsmanager.fs-stat-cache.time}) }"/>
+  </task:scheduled-tasks>
+
+
   <beans profile="inotify-true">
       <bean id="event-notifier" class="diskCacheV111.namespace.EventNotifier">
           <description>Service allowing other dCache components to be notified of namespace events</description>
@@ -161,4 +181,6 @@
           <property name="nameSpaceProvider" ref="name-space-provider"/>
       </bean>
   </beans>
+
+
 </beans>
