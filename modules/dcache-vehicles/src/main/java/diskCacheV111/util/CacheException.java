@@ -140,6 +140,12 @@ public class CacheException extends Exception
     /** Tried to modify attribute but it does not exists. **/
     public static final int NO_ATTRIBUTE = 10030;
 
+    /** Group quota exceeded. **/
+    public static final int GROUP_QUOTA_EXCEEDED = 10031;
+
+    /** User quota exceeded. **/
+    public static final int USER_QUOTA_EXCEEDED = 10032;
+
     /**
      * default error code. <b>It's recommended to use more specific error
      * codes</b>

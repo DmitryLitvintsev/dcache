@@ -44,7 +44,7 @@
       <property name="scheduledExecutor" ref="scheduled-executor"/>
       <property name="updateFsStatInterval" value="${pnfsmanager.fs-stat-cache.time}"/>
       <property name="updateFsStatIntervalUnit" value="${pnfsmanager.fs-stat-cache.time.unit}"/>
-
+      <property name="quotaSystem" ref="quota-system"/>
   </bean>
 
     <bean id="data-source" class="org.dcache.db.AlarmEnabledDataSource" destroy-method="close">
@@ -98,6 +98,11 @@
       <description>Chimera</description>
       <constructor-arg ref="data-source"/>
       <constructor-arg ref="tx-manager"/>
+  </bean>
+
+  <bean id="quota-system" class="org.dcache.chimera.quota.JdbcQuota" depends-on="liquibase">
+      <description>Quota</description>
+      <constructor-arg ref="data-source"/>
   </bean>
 
   <bean id="extractor" class="${pnfsmanager.plugins.storage-info-extractor}">

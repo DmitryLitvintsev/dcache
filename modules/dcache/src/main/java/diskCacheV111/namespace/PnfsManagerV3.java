@@ -8,6 +8,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import diskCacheV111.util.*;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,16 +44,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import diskCacheV111.util.AccessLatency;
-import diskCacheV111.util.CacheException;
-import diskCacheV111.util.FileNotFoundCacheException;
-import diskCacheV111.util.FsPath;
-import diskCacheV111.util.InvalidMessageCacheException;
-import diskCacheV111.util.MissingResourceCacheException;
-import diskCacheV111.util.NotDirCacheException;
-import diskCacheV111.util.PermissionDeniedCacheException;
-import diskCacheV111.util.PnfsId;
-import diskCacheV111.util.RetentionPolicy;
 import diskCacheV111.vehicles.DoorCancelledUploadNotificationMessage;
 import diskCacheV111.vehicles.Message;
 import diskCacheV111.vehicles.PnfsAddCacheLocationMessage;
@@ -118,6 +109,7 @@ import org.dcache.vehicles.PnfsGetFileAttributes;
 import org.dcache.vehicles.PnfsListDirectoryMessage;
 import org.dcache.vehicles.PnfsRemoveChecksumMessage;
 import org.dcache.vehicles.PnfsSetFileAttributes;
+import org.dcache.chimera.quota.JdbcQuota;
 
 import static java.util.Objects.requireNonNull;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -171,6 +163,10 @@ public class PnfsManagerV3
     private TimeUnit updateFsStatIntervalUnit;
     private long updateFsStatInterval;
 
+    private ScheduledFuture<?> updateGroupQuotaFuture;
+    private ScheduledFuture<?> updateUserQuotaFuture;
+
+
     /**
      * Whether to use folding.
      */
@@ -217,6 +213,8 @@ public class PnfsManagerV3
     private List<String> _cancelUploadNotificationTargets = Collections.emptyList();
 
     private List<ProcessThread> _listProcessThreads = new ArrayList<>();
+
+    private JdbcQuota quotaSystem;
 
     private void populateRequestMap()
     {
@@ -360,6 +358,18 @@ public class PnfsManagerV3
         _cancelUploadNotificationTargets = Splitter.on(',').omitEmptyStrings().splitToList(target);
     }
 
+    @Required
+    public void setQuotaSystem(JdbcQuota quota) 
+    {
+        quotaSystem = quota;
+    }
+
+    @Required
+    public JdbcQuota getQuotaSystem()
+    {
+        return quotaSystem;
+    }
+
     public void init()
     {
         _stub = new CellStub(getCellEndpoint());
@@ -385,6 +395,31 @@ public class PnfsManagerV3
             _listProcessThreads.add(t);
             executor.execute(t);
         }
+
+        ScheduledFuture<?>  refreshUserQuota = scheduledExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                    quotaSystem.refreshUserQuotas();
+                            }
+                        }),
+                        10,
+                        10000,
+                        TimeUnit.MILLISECONDS);
+
+        ScheduledFuture<?>  refreshGroupQuota = scheduledExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                    quotaSystem.refreshGroupQuotas();
+                            }
+                        }),
+                        10,
+                        10000,
+                        TimeUnit.MILLISECONDS);
+
     }
 
     public void shutdown() throws InterruptedException
@@ -433,12 +468,37 @@ public class PnfsManagerV3
                                    100000,
                                    updateFsStatIntervalUnit.toMillis(updateFsStatInterval),
                                    TimeUnit.MILLISECONDS);
+
+        updateGroupQuotaFuture = scheduledExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                quotaSystem.updateGroupQuotas();
+                            }
+                        }),
+                        100000,
+                        3600000,
+                        TimeUnit.MILLISECONDS);
+
+        updateUserQuotaFuture = scheduledExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                quotaSystem.updateUserQuotas();
+                            }
+                        }),
+                        100000,
+                        3600000,
+                        TimeUnit.MILLISECONDS);
     }
 
     @Override
-    public void notLeader()
-    {
+    public void notLeader() {
         updateFsFuture.cancel(true);
+        updateGroupQuotaFuture.cancel(true);
+        updateUserQuotaFuture.cancel(true);
     }
 
 
@@ -1507,6 +1567,24 @@ public class PnfsManagerV3
 
             case REGULAR:
                 _log.info("create file {}", path);
+                String parentPath = file.getParent();
+                PnfsId parentPnfsId = _nameSpaceProvider.pathToPnfsid(ROOT, parentPath, false);
+		
+                FileAttributes parentAttributes =
+                        _nameSpaceProvider.getFileAttributes(ROOT, parentPnfsId,
+                                EnumSet.of(FileAttribute.ACCESS_LATENCY,
+                                        FileAttribute.RETENTION_POLICY));
+
+                RetentionPolicy rp = parentAttributes.getRetentionPolicyIfPresent().orElse(null);
+                int uid = assign.getOwnerIfPresent().orElse(-1);
+                int gid = assign.getGroupIfPresent().orElse(-1);
+                if (!quotaSystem.checkGroupQuota(gid, rp)) {
+                    throw new GroupQuotaCacheException(String.format("%s group quota exceeded for gid=%d", rp, gid));
+                }
+
+                if (!quotaSystem.checkUserQuota(uid, rp)) {
+                    throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, gid));
+                }
                 checkRestriction(pnfsMessage, UPLOAD);
 
                 requested.add(FileAttribute.STORAGEINFO);
@@ -2054,7 +2132,7 @@ public class PnfsManagerV3
     }
 
     @Transactional
-    private boolean processMessageTransactionally(CellMessage message, PnfsMessage pnfsMessage)
+    boolean processMessageTransactionally(CellMessage message, PnfsMessage pnfsMessage)
     {
         if (pnfsMessage instanceof PnfsAddCacheLocationMessage) {
             addCacheLocation((PnfsAddCacheLocationMessage) pnfsMessage);
