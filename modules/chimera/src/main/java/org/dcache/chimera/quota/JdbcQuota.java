@@ -1,5 +1,8 @@
 package org.dcache.chimera.quota;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import diskCacheV111.util.RetentionPolicy;
 import org.dcache.chimera.ChimeraFsException;
 
@@ -12,6 +15,10 @@ public class JdbcQuota {
     /**
      * SQL query engine
      */
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(JdbcQuota.class);
+
     private final QuotaSqlDriver sqlDriver;
     private volatile Map<Integer, Quota> userQuotas;
     private volatile Map<Integer, Quota> groupQuotas;
@@ -28,8 +35,10 @@ public class JdbcQuota {
     public boolean checkUserQuota(int uid, RetentionPolicy rp) {
         Quota quota = userQuotas.get(uid);
         if (quota == null)  {
+            LOGGER.info("Failed to find user quota for {}", uid);
             return true;
         } else {
+            LOGGER.info("Found group quota for {} {} {}", quota.getId(), quota.getUsedCustodialSpaceLimit(), quota.getUsedReplicaSpaceLimit());
             return quota.check(rp);
         }
     }
@@ -37,8 +46,10 @@ public class JdbcQuota {
     public boolean checkGroupQuota(int gid, RetentionPolicy rp) { 
         Quota quota = groupQuotas.get(gid);
         if (quota == null)  {
+            LOGGER.info("Failed to find group quota for {}", gid);
             return true;
         } else {
+            LOGGER.info("Found group quota for {} {} {}", quota.getId(), quota.getUsedCustodialSpaceLimit(), quota.getUsedReplicaSpaceLimit());
             return quota.check(rp);
         }
     }

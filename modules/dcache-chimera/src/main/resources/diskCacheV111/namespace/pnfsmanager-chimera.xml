@@ -138,7 +138,7 @@
           <bean class="java.util.concurrent.Executors"
                 factory-method="newScheduledThreadPool"
                 destroy-method="shutdown">
-              <constructor-arg value="2"/>
+              <constructor-arg value="5"/>
           </bean>
       </constructor-arg>
   </bean>

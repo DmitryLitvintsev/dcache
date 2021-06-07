@@ -40,3 +40,6 @@
 
 # Ignoring .reviewboardrc file
 .reviewboardrc
+
+#Emacs 
+*~
