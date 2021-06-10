@@ -1,6 +1,8 @@
 package org.dcache.chimera.quota;
 
 import org.dcache.chimera.ChimeraFsException;
+import org.dcache.chimera.quota.spi.DbDriverProvider;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,11 +12,15 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 public class QuotaSqlDriver { 
 
 	private static final Logger LOGGER =
 	LoggerFactory.getLogger(QuotaSqlDriver.class);
+
+	private static final ServiceLoader<DbDriverProvider> ALL_PROVIDERS
+			= ServiceLoader.load(DbDriverProvider.class);
 
     final JdbcTemplate jdbc;
 
@@ -24,47 +30,65 @@ public class QuotaSqlDriver {
     	jdbc = new JdbcTemplate(dataSource);
     }
 
-
-    public static QuotaSqlDriver getDriverInstance(DataSource dataSource) 
+	public static QuotaSqlDriver getDriverInstance(DataSource dataSource)
 	throws ChimeraFsException, SQLException
     {
-    	return new QuotaSqlDriver(dataSource);
+  		for (DbDriverProvider driverProvider: ALL_PROVIDERS) {
+			if (driverProvider.isSupportDB(dataSource)) {
+				QuotaSqlDriver driver = driverProvider.getDriver(dataSource);
+				LOGGER.info("Using DBDriverProvider for Quota: {}", driver.getClass().getName());
+				return driver;
+			}
+		}
+		return new QuotaSqlDriver(dataSource);
     }
 
-    /**
-       Update user quotas 
-     */ 
     private static final String UPDATE_USER_QUOTAS_SQL =
-			"UPDATE t_user_quota set "+
-					"ireplica_used = t.replica, "+
-					"icustodial_used = t.custodial, "+
-					"ioutput_used = t.output "+
-					"FROM ( "+
-					"SELECT iuid, SUM(CASE WHEN iretention_policy = 2 THEN isize ELSE 0 END) AS replica, "+
-					"SUM(CASE WHEN iretention_policy = 1 THEN isize else 0 end) AS output, "+
-					"SUM(CASE WHEN iretention_policy = 0 THEN isize else 0 end) AS custodial "+
-					"FROM t_inodes WHERE iuid IN (SELECT iuid FROM t_user_quota) AND itype=32768 GROUP BY iuid) t "+
-					"WHERE t.iuid = t_user_quota.iuid";
-
+			"MERGE INTO t_user_quota "+
+					"USING (SELECT "+
+					"iuid, "+
+					"SUM(CASE WHEN iretention_policy = 0 THEN isize ELSE 0 END) AS custodial, "+
+					"SUM(CASE WHEN iretention_policy = 1 THEN isize ELSE 0 END) AS output, "+
+					"SUM(CASE WHEN iretention_policy = 2 THEN isize ELSE 0 END) AS replica "+
+					"FROM t_inodes WHERE itype=32768 "+
+					"AND iuid IN (SELECT iuid FROM t_user_quota) "+
+					"GROUP BY iuid) AS t(iuid, custodial, output, replica) "+
+					"ON t.iuid = t_user_quota.iuid "+
+					"WHEN MATCHED THEN UPDATE SET "+
+					"t_user_quota.icustodial_used = t.custodial, "+
+					"t_user_quota.ioutput_used = t.output, "+
+					"t_user_quota.ireplica_used = t.replica "+
+					"WHEN NOT MATCHED THEN INSERT "+
+					"(iuid, icustodial_used, ioutput_used, ireplica_used) "+
+					"VALUES (t.iuid, t.custodial, t.output, t.replica)";
+    /**
+       Update user quotas
+     */
    public void updateUserQuota() {
 	   jdbc.update(UPDATE_USER_QUOTAS_SQL);
    }
 
+	private static final String UPDATE_GROUP_QUOTAS_SQL =
+			"MERGE INTO t_group_quota "+
+					"USING (SELECT "+
+					"igid, "+
+					"SUM(CASE WHEN iretention_policy = 0 THEN isize ELSE 0 END) AS custodial, "+
+					"SUM(CASE WHEN iretention_policy = 1 THEN isize ELSE 0 END) AS output, "+
+					"SUM(CASE WHEN iretention_policy = 2 THEN isize ELSE 0 END) AS replica "+
+					"FROM t_inodes WHERE itype=32768 "+
+					"AND igid IN (SELECT igid FROM t_group_quota) "+
+					"GROUP BY igid) AS t(igid, custodial, output, replica) "+
+					"ON t.igid = t_group_quota.igid "+
+					"WHEN MATCHED THEN UPDATE SET "+
+					"t_group_quota.icustodial_used = t.custodial, "+
+					"t_group_quota.ioutput_used = t.output, "+
+					"t_group_quota.ireplica_used = t.replica "+
+					"WHEN NOT MATCHED THEN INSERT "+
+					"(igid, icustodial_used, ioutput_used, ireplica_used) "+
+					"VALUES (t.igid, t.custodial, t.output, t.replica)";
     /**
        Update group quotas 
-     */ 
-    private static final String UPDATE_GROUP_QUOTAS_SQL =
-			"UPDATE t_group_quota set "+
-					"ireplica_used = t.replica, "+
-					"icustodial_used = t.custodial, "+
-					"ioutput_used = t.output "+
-					"FROM ( "+
-					"SELECT igid, SUM(CASE WHEN iretention_policy = 2 THEN isize ELSE 0 END) AS replica, "+
-					"SUM(CASE WHEN iretention_policy = 1 THEN isize else 0 end) AS output, "+
-					"SUM(CASE WHEN iretention_policy = 0 THEN isize else 0 end) AS custodial "+
-					"FROM t_inodes WHERE igid IN (SELECT igid FROM t_group_quota) AND itype=32768 GROUP BY igid) t "+
-					"WHERE t.igid = t_group_quota.igid";
-
+     */
     public void updateGroupQuota() {
 		jdbc.update(UPDATE_GROUP_QUOTAS_SQL);
     }
@@ -134,9 +158,9 @@ public class QuotaSqlDriver {
 
     public void setUserQuota(Quota q) {
 		jdbc.update(UPDATE_USER_QUOTA_SQL,
-				q.getUsedCustodialSpaceLimit(),
-				q.getUsedOutputSpaceLimit(),
-				q.getUsedReplicaSpaceLimit(),
+				q.getCustodialSpaceLimit(),
+				q.getOutputSpaceLimit(),
+				q.getReplicaSpaceLimit(),
 				q.getId());
 	}
 
@@ -147,9 +171,9 @@ public class QuotaSqlDriver {
 
     public void setGroupQuota(Quota q) {
 		jdbc.update(UPDATE_GROUP_QUOTA_SQL,
-				q.getUsedCustodialSpaceLimit(),
-				q.getUsedOutputSpaceLimit(),
-				q.getUsedReplicaSpaceLimit(),
+				q.getCustodialSpaceLimit(),
+				q.getOutputSpaceLimit(),
+				q.getReplicaSpaceLimit(),
 				q.getId());
 	}
 }

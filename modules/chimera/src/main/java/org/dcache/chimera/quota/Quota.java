@@ -8,25 +8,26 @@ public class Quota {
     private final long usedReplicaSpace;
     private final long usedOutputSpace;
 
-    private final Long usedCustodialSpaceLimit;
-    private final Long usedReplicaSpaceLimit;
-    private final Long usedOutputSpaceLimit;
+    private final Long custodialSpaceLimit;
+    private final Long replicaSpaceLimit;
+    private final Long outputSpaceLimit;
 
     public Quota(int id,
                  long usedCustodialSpace,
-                 Long usedCustodialSpaceLimit,
+                 Long custodialSpaceLimit,
                  long usedOutputSpace,
-                 Long usedOutputSpaceLimit,
+                 Long outputSpaceLimit,
                  long usedReplicaSpace,
-                 Long usedReplicaSpaceLimit
-                 ) {
+                 Long replicaSpaceLimit
+                 )
+    {
         this.id = id;
         this.usedCustodialSpace = usedCustodialSpace;
         this.usedReplicaSpace = usedReplicaSpace;
         this.usedOutputSpace = usedOutputSpace;
-        this.usedCustodialSpaceLimit = usedCustodialSpaceLimit;
-        this.usedOutputSpaceLimit = usedOutputSpaceLimit;
-        this.usedReplicaSpaceLimit = usedReplicaSpaceLimit;
+        this.custodialSpaceLimit = custodialSpaceLimit;
+        this.outputSpaceLimit = outputSpaceLimit;
+        this.replicaSpaceLimit = replicaSpaceLimit;
     }
     public int getId() {
         return id;
@@ -44,32 +45,33 @@ public class Quota {
         return usedOutputSpace;
     }
 
-    public Long getUsedCustodialSpaceLimit() {
-        return usedCustodialSpaceLimit;
+    public Long getCustodialSpaceLimit() {
+        return custodialSpaceLimit;
     }
 
-    public Long getUsedReplicaSpaceLimit() {
-        return usedReplicaSpaceLimit;
+    public Long getReplicaSpaceLimit() {
+        return replicaSpaceLimit;
     }
 
-    public Long getUsedOutputSpaceLimit() {
-        return usedOutputSpaceLimit;
+    public Long getOutputSpaceLimit() {
+        return outputSpaceLimit;
     }
 
-    public boolean check(RetentionPolicy retentionPolicy) {
+    public boolean check(RetentionPolicy retentionPolicy)
+    {
         if (retentionPolicy == RetentionPolicy.CUSTODIAL &&
-                usedCustodialSpaceLimit != null &&
-                usedCustodialSpaceLimit < usedCustodialSpace) {
+                custodialSpaceLimit != null &&
+                custodialSpaceLimit < usedCustodialSpace) {
 	        return false;
 	    }
         if (retentionPolicy == RetentionPolicy.REPLICA &&
-                usedReplicaSpaceLimit != null &&
-                usedReplicaSpaceLimit < usedReplicaSpace) {
+                replicaSpaceLimit != null &&
+                replicaSpaceLimit < usedReplicaSpace) {
 	        return false;
 	    }
 	    if (retentionPolicy == RetentionPolicy.OUTPUT &&
-                usedOutputSpaceLimit != null &&
-                usedOutputSpaceLimit < usedOutputSpace) {
+                outputSpaceLimit != null &&
+                outputSpaceLimit < usedOutputSpace) {
             return false;
         }
 	    return true;

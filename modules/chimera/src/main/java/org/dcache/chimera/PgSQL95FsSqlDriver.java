@@ -416,6 +416,6 @@ public class PgSQL95FsSqlDriver extends FsSqlDriver {
                      "iusedSpace = t.usedSpace "+
                      "FROM (SELECT count(*) AS usedFiles, "+
                      "SUM(isize) AS usedSpace FROM t_inodes "+
-                     "WHERE itype=32768) t");
+                     "WHERE itype=32768) as t");
     }
 }

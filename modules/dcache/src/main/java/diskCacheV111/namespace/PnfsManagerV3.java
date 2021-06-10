@@ -10,6 +10,8 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import diskCacheV111.util.*;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
+import org.dcache.chimera.quota.Quota;
+import org.dcache.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
@@ -23,17 +25,7 @@ import java.io.PrintWriter;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -96,13 +88,7 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.ListHandler;
 import org.dcache.namespace.PermissionHandler;
-import org.dcache.util.Args;
-import org.dcache.util.Checksum;
-import org.dcache.util.ChecksumType;
-import org.dcache.util.ColumnWriter;
 import org.dcache.util.ColumnWriter.TabulatedRow;
-import org.dcache.util.FireAndForgetTask;
-import org.dcache.util.TimeUtils;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.vehicles.PnfsCreateSymLinkMessage;
 import org.dcache.vehicles.PnfsGetFileAttributes;
@@ -904,6 +890,127 @@ public class PnfsManagerV3
             return "";
         }
     }
+
+    @Command(name = "show group quota",
+             hint = "Print group quota",
+             description = "Display group quota")
+
+    public class ShowGroupQuotaCommand implements Callable<String> {
+        @Option(name = "gid",
+                usage = "Get group quota info by GID")
+        String gid;
+
+        @Option(name = "h",
+                usage = "Use unit suffixes Byte, Kilobyte, Megabyte, Gigabyte, Terabyte and " +
+                        "Petabyte in order to reduce the number of digits to three or less " +
+                        "using base 10 for sizes.")
+        boolean humanReadable;
+
+        @Override
+        public String call() throws CacheException {
+            Optional<ByteUnit> displayUnit = humanReadable
+                    ? Optional.empty()
+                    : Optional.of(ByteUnit.BYTES);
+
+            ColumnWriter table = new ColumnWriter()
+                    .header("gid").right("gid").space()
+                    .header("CUSTODIAL").bytes("custodial", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("custodial_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space()
+                    .header("REPLICA").bytes("replica", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("replica_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space()
+                    .header("OUTPUT").bytes("output", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("output_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space();
+            Map<Integer, Quota> quotas = quotaSystem.getGroupQuotas();
+            if (gid != null) {
+                int igid = Integer.parseInt(gid);
+                Quota quota = quotas.get(igid);
+                if (quota == null) {
+                    throw new CacheException("No group found");
+                }
+                fillRow(table, quota);
+            } else {
+                SortedSet<Integer> keys = new TreeSet<>(quotas.keySet());
+                for (Integer key : keys) {
+                    Quota quota = quotas.get(key);
+                    fillRow(table, quota);
+                }
+            }
+            return table.toString();
+        }
+
+        private void fillRow(ColumnWriter table, Quota quota) {
+            table.row()
+                    .value("gid", quota.getId())
+                    .value("custodial", quota.getUsedCustodialSpace())
+                    .value("custodial_limit", quota.getCustodialSpaceLimit())
+                    .value("replica", quota.getUsedReplicaSpace())
+                    .value("replica_limit", quota.getReplicaSpaceLimit())
+                    .value("output", quota.getUsedOutputSpace())
+                    .value("output_limit", quota.getOutputSpaceLimit());
+        }
+
+    }
+
+    @Command(name = "show user quota",
+             hint = "Print user quota",
+             description = "Display user quota")
+
+    public class ShowUserQuotaCommand implements Callable<String> {
+        @Option(name = "uid",
+                usage = "Get user quota info by UID")
+        String uid;
+
+        @Option(name = "h",
+                usage = "Use unit suffixes Byte, Kilobyte, Megabyte, Gigabyte, Terabyte and " +
+                        "Petabyte in order to reduce the number of digits to three or less " +
+                        "using base 10 for sizes.")
+        boolean humanReadable;
+
+        @Override
+        public String call() throws CacheException {
+            Optional<ByteUnit> displayUnit = humanReadable
+                    ? Optional.empty()
+                    : Optional.of(ByteUnit.BYTES);
+
+            ColumnWriter table = new ColumnWriter()
+                    .header("uid").right("uid").space()
+                    .header("CUSTODIAL").bytes("custodial", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("custodial_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space()
+                    .header("REPLICA").bytes("replica", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("replica_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space()
+                    .header("OUTPUT").bytes("output", displayUnit, ByteUnit.Type.DECIMAL).space()
+                    .header("limit").bytes("output_limit", displayUnit, ByteUnit.Type.DECIMAL, "NONE").space();
+            Map<Integer, Quota> quotas = quotaSystem.getUserQuotas();
+            if (uid != null) {
+                int iuid = Integer.parseInt(uid);
+                Quota quota = quotas.get(iuid);
+                if (quota == null) {
+                    throw new CacheException("No user found");
+                }
+                fillRow(table, quota);
+            } else {
+                SortedSet<Integer> keys = new TreeSet<>(quotas.keySet());
+                for (Integer key : keys) {
+                    Quota quota = quotas.get(key);
+                    fillRow(table, quota);
+                }
+            }
+            return table.toString();
+        }
+
+        private void fillRow(ColumnWriter table, Quota quota) {
+            table.row()
+                    .value("uid", quota.getId())
+                    .value("custodial", quota.getUsedCustodialSpace())
+                    .value("custodial_limit", quota.getCustodialSpaceLimit())
+                    .value("replica", quota.getUsedReplicaSpace())
+                    .value("replica_limit", quota.getReplicaSpaceLimit())
+                    .value("output", quota.getUsedOutputSpace())
+                    .value("output_limit", quota.getOutputSpaceLimit());
+        }
+    }
+
+
 
     public static final String hh_add_file_cache_location = "<pnfsid> <pool name>";
     public String ac_add_file_cache_location_$_2(Args args) throws Exception {
