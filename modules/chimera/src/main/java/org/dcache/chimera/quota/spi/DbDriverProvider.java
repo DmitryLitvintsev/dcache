@@ -6,7 +6,7 @@ import org.dcache.chimera.ChimeraFsException;
 import org.dcache.chimera.quota.QuotaSqlDriver;
 
 /**
- * SPI interface to Driver provider. Provide must crate an instance of a
+ * SPI interface to Driver provider. Provider must create an instance of
  * {@link QuotaSqlDriver} for a supported DB type.
  */
 public interface DbDriverProvider {

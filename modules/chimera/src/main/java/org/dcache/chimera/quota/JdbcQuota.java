@@ -40,6 +40,22 @@ public class JdbcQuota {
         return groupQuotas;
     }
 
+    public void setUserQuota(Quota quota) {
+        sqlDriver.setUserQuota(quota);
+    }
+
+    public void createUserQuota(Quota quota) {
+        sqlDriver.createUserQuota(quota);
+    }
+
+    public void setGroupQuota(Quota quota) {
+        sqlDriver.setGroupQuota(quota);
+    }
+
+    public void createGroupQuota(Quota quota) {
+        sqlDriver.createGroupQuota(quota);
+    }
+
     public boolean checkUserQuota(int uid, RetentionPolicy rp)
     {
         Quota quota = userQuotas.get(uid);

@@ -2,15 +2,16 @@ package org.dcache.chimera.quota;
 
 import diskCacheV111.util.RetentionPolicy;
 
-public class Quota { 
+
+public class Quota {
     int id;
     private final long usedCustodialSpace;
     private final long usedReplicaSpace;
     private final long usedOutputSpace;
 
-    private final Long custodialSpaceLimit;
-    private final Long replicaSpaceLimit;
-    private final Long outputSpaceLimit;
+    private Long custodialSpaceLimit;
+    private Long replicaSpaceLimit;
+    private Long outputSpaceLimit;
 
     public Quota(int id,
                  long usedCustodialSpace,
@@ -18,9 +19,7 @@ public class Quota {
                  long usedOutputSpace,
                  Long outputSpaceLimit,
                  long usedReplicaSpace,
-                 Long replicaSpaceLimit
-                 )
-    {
+                 Long replicaSpaceLimit) {
         this.id = id;
         this.usedCustodialSpace = usedCustodialSpace;
         this.usedReplicaSpace = usedReplicaSpace;
@@ -29,10 +28,11 @@ public class Quota {
         this.outputSpaceLimit = outputSpaceLimit;
         this.replicaSpaceLimit = replicaSpaceLimit;
     }
+
     public int getId() {
         return id;
     }
-    
+
     public long getUsedCustodialSpace() {
         return usedCustodialSpace;
     }
@@ -57,23 +57,34 @@ public class Quota {
         return outputSpaceLimit;
     }
 
-    public boolean check(RetentionPolicy retentionPolicy)
-    {
+    public void setCustodialSpaceLimit(Long custodialSpaceLimit) {
+        this.custodialSpaceLimit = custodialSpaceLimit;
+    }
+
+    public void setReplicaSpaceLimit(Long replicaSpaceLimit) {
+        this.replicaSpaceLimit = replicaSpaceLimit;
+    }
+
+    public void setOutputSpaceLimit(Long outputSpaceLimit) {
+        this.outputSpaceLimit = outputSpaceLimit;
+    }
+
+    public boolean check(RetentionPolicy retentionPolicy) {
         if (retentionPolicy == RetentionPolicy.CUSTODIAL &&
                 custodialSpaceLimit != null &&
                 custodialSpaceLimit < usedCustodialSpace) {
-	        return false;
-	    }
+            return false;
+        }
         if (retentionPolicy == RetentionPolicy.REPLICA &&
                 replicaSpaceLimit != null &&
                 replicaSpaceLimit < usedReplicaSpace) {
-	        return false;
-	    }
-	    if (retentionPolicy == RetentionPolicy.OUTPUT &&
+            return false;
+        }
+        if (retentionPolicy == RetentionPolicy.OUTPUT &&
                 outputSpaceLimit != null &&
                 outputSpaceLimit < usedOutputSpace) {
             return false;
         }
-	    return true;
-    }    
+        return true;
+    }
 }

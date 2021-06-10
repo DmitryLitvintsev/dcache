@@ -157,11 +157,7 @@ public class QuotaSqlDriver {
 					"WHERE iuid = ?";
 
     public void setUserQuota(Quota q) {
-		jdbc.update(UPDATE_USER_QUOTA_SQL,
-				q.getCustodialSpaceLimit(),
-				q.getOutputSpaceLimit(),
-				q.getReplicaSpaceLimit(),
-				q.getId());
+		setQuota(UPDATE_USER_QUOTA_SQL, q);
 	}
 
     private static final String UPDATE_GROUP_QUOTA_SQL =
@@ -170,10 +166,40 @@ public class QuotaSqlDriver {
 					"WHERE igid = ?";
 
     public void setGroupQuota(Quota q) {
-		jdbc.update(UPDATE_GROUP_QUOTA_SQL,
+		setQuota(UPDATE_GROUP_QUOTA_SQL, q);
+	}
+
+	public void setQuota(String query, Quota q) {
+    	jdbc.update(query,
 				q.getCustodialSpaceLimit(),
 				q.getOutputSpaceLimit(),
 				q.getReplicaSpaceLimit(),
 				q.getId());
+	}
+	private static final String INSERT_USER_QUOTA =
+			"INSERT INTO t_user_quota (iuid, icustodial_used, ioutput_used, ireplica_used, "+
+					"icustodial_limit, ioutput_limit, ireplica_limit) "+
+					"VALUES (?, 0, 0, 0, ?, ?, ?)";
+
+    public void createUserQuota(Quota q) {
+		createQuota(INSERT_USER_QUOTA, q);
+	}
+
+	private static final String INSERT_GROUP_QUOTA =
+			"INSERT INTO t_group_quota (igid, icustodial_used, ioutput_used, ireplica_used, " +
+					"icustodial_limit, ioutput_limit, ireplica_limit) "+
+					"VALUES (?, 0, 0, 0, ?, ?, ?)";
+
+    public void createGroupQuota(Quota q) {
+		createQuota(INSERT_GROUP_QUOTA, q);
+	}
+
+	private void createQuota(String query, Quota q) {
+		jdbc.update(query,
+				q.getId(),
+				q.getCustodialSpaceLimit(),
+				q.getOutputSpaceLimit(),
+				q.getReplicaSpaceLimit());
+
 	}
 }

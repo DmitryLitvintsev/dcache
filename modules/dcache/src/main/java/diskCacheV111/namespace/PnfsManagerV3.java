@@ -1010,6 +1010,134 @@ public class PnfsManagerV3
         }
     }
 
+    @Command(name = "set user quota",
+            hint = "Set user quota",
+            description = "Set user quota")
+
+    public class SetUserQuotaCommand implements Callable<String> {
+
+        @Argument(index = 0,
+                valueSpec = "UID",
+                usage = "User uid.")
+        int uid;
+
+        @Option(name = "custodial",
+                usage = "Specify custodial user quota in bytes; \"null\" value removes quota.")
+        String custodial;
+
+        @Option(name = "replica",
+                usage = "Specify replica user quota in bytes; \"null\" value removes quota.")
+        String replica;
+
+        @Option(name = "output",
+                usage = "Specify output user quota in bytes; \"null\" value removes quota.")
+        String output;
+
+        @Override
+        public String call() throws CacheException {
+            if (custodial == null &&
+                    replica == null &&
+                    output == null) {
+                throw new CacheException("At least one option needs to be specified");
+            }
+
+            Quota quota = quotaSystem.getUserQuotas().get(uid);
+
+            if (quota == null) {
+                quota = new Quota(uid, 0, null,
+                        0, null, 0, null);
+                quotaSystem.createUserQuota(quota);
+            } else {
+                furnishQuota(quota);
+                quotaSystem.setUserQuota(quota);
+            }
+            return "OK";
+        }
+
+        private void furnishQuota(Quota q) {
+            if (custodial != null) {
+                Long custodialLimit = custodial.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(custodial);
+                q.setCustodialSpaceLimit(custodialLimit);
+            }
+            if (replica != null) {
+                Long replicaLimit = replica.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(replica);
+                q.setReplicaSpaceLimit(replicaLimit);
+            }
+            if (output != null) {
+                Long outputLimit = output.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(output);
+                q.setOutputSpaceLimit(outputLimit);
+            }
+        }
+    }
+
+        @Command(name = "set group quota",
+            hint = "Set group quota",
+            description = "Set group quota")
+
+    public class SetGroupQuotaCommand implements Callable<String> {
+
+        @Argument(index = 0,
+                valueSpec = "GID",
+                usage = "User gid.")
+        int gid;
+
+        @Option(name = "custodial",
+                usage = "Specify custodial group quota in bytes; \"null\" value removes quota.")
+        String custodial;
+
+        @Option(name = "replica",
+                usage = "Specify replica group quota in bytes; \"null\" value removes quota.")
+        String replica;
+
+        @Option(name = "output",
+                usage = "Specify output group quota in bytes; \"null\" value removes quota.")
+        String output;
+
+        @Override
+        public String call() throws CacheException {
+
+            if (custodial == null &&
+                    replica == null &&
+                    output == null) {
+                throw new CacheException("At least one option needs to be specified");
+            }
+
+            Quota quota = quotaSystem.getGroupQuotas().get(gid);
+
+            if (quota == null) {
+                quota = new Quota(gid, 0, null,
+                        0, null, 0, null);
+                quotaSystem.createGroupQuota(quota);
+            } else {
+                furnishQuota(quota);
+                quotaSystem.setGroupQuota(quota);
+            }
+            return "OK";
+        }
+
+        private void furnishQuota(Quota q) {
+            if (custodial != null) {
+                Long custodialLimit = custodial.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(custodial);
+                q.setCustodialSpaceLimit(custodialLimit);
+            }
+            if (replica != null) {
+                Long replicaLimit = replica.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(replica);
+                q.setReplicaSpaceLimit(replicaLimit);
+            }
+            if (output != null) {
+                Long outputLimit = output.equalsIgnoreCase("null") ?
+                        null : Long.valueOf(output);
+                q.setOutputSpaceLimit(outputLimit);
+            }
+        }
+    }
+
+
 
 
     public static final String hh_add_file_cache_location = "<pnfsid> <pool name>";
