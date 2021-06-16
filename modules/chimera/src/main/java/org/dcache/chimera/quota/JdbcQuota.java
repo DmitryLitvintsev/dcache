@@ -1,20 +1,76 @@
+/*
+COPYRIGHT STATUS:
+Dec 1st 2001, Fermi National Accelerator Laboratory (FNAL) documents and
+software are sponsored by the U.S. Department of Energy under Contract No.
+DE-AC02-76CH03000. Therefore, the U.S. Government retains a  world-wide
+non-exclusive, royalty-free license to publish or reproduce these documents
+and software for U.S. Government purposes.  All documents and software
+available from this server are protected under the U.S. and Foreign
+Copyright Laws, and FNAL reserves all rights.
+
+Distribution of the software available from this server is free of
+charge subject to the user following the terms of the Fermitools
+Software Legal Information.
+
+Redistribution and/or modification of the software shall be accompanied
+by the Fermitools Software Legal Information  (including the copyright
+notice).
+
+The user is asked to feed back problems, benefits, and/or suggestions
+about the software to the Fermilab Software Providers.
+
+Neither the name of Fermilab, the  URA, nor the names of the contributors
+may be used to endorse or promote products derived from this software
+without specific prior written permission.
+
+DISCLAIMER OF LIABILITY (BSD):
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED  WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED  WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL FERMILAB,
+OR THE URA, OR THE U.S. DEPARTMENT of ENERGY, OR CONTRIBUTORS BE LIABLE
+FOR  ANY  DIRECT, INDIRECT,  INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+OF SUBSTITUTE  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY  OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT  OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE  POSSIBILITY OF SUCH DAMAGE.
+
+Liabilities of the Government:
+
+This software is provided by URA, independent from its Prime Contract
+with the U.S. Department of Energy. URA is acting independently from
+the Government and in its own private capacity and is not acting on
+behalf of the U.S. Government, nor as its contractor nor its agent.
+Correspondingly, it is understood and agreed that the U.S. Government
+has no connection to this software and in no manner whatsoever shall
+be liable for nor assume any responsibility or obligation for any claim,
+cost, or damages arising out of or resulting from the use of the software
+available from this server.
+
+Export Control:
+
+All documents and software available from this server are subject to U.S.
+export control laws.  Anyone downloading information from this server is
+obligated to secure any necessary Government licenses before exporting
+documents or software obtained from this server.
+*/
+
 package org.dcache.chimera.quota;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import diskCacheV111.util.RetentionPolicy;
-import org.dcache.chimera.ChimeraFsException;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Map;
 
 
-public class JdbcQuota {
-    /**
-     * SQL query engine
-     */
+public class JdbcQuota implements QuotaHandler {
 
     private static final Logger LOGGER =
             LoggerFactory.getLogger(JdbcQuota.class);
@@ -25,61 +81,72 @@ public class JdbcQuota {
 
    
     public JdbcQuota(DataSource ds)
-            throws SQLException, ChimeraFsException
+            throws SQLException
     {
         sqlDriver = QuotaSqlDriver.getDriverInstance(ds);
         userQuotas = sqlDriver.getUserQuotas();
         groupQuotas = sqlDriver.getGroupQuotas();
     }
 
-    public Map<Integer, Quota> getUserQuotas() {
+    @Override
+    public Map<Integer, Quota> getUserQuotas()
+    {
         return userQuotas;
     }
 
-    public Map<Integer, Quota> getGroupQuotas() {
+    @Override
+    public Map<Integer, Quota> getGroupQuotas()
+    {
         return groupQuotas;
     }
 
-    public void setUserQuota(Quota quota) {
+    @Override
+    public void setUserQuota(Quota quota)
+    {
         sqlDriver.setUserQuota(quota);
     }
 
-    public void createUserQuota(Quota quota) {
+    @Override
+    public void createUserQuota(Quota quota)
+    {
         sqlDriver.createUserQuota(quota);
     }
 
-    public void setGroupQuota(Quota quota) {
+    @Override
+    public void setGroupQuota(Quota quota)
+    {
         sqlDriver.setGroupQuota(quota);
     }
 
-    public void createGroupQuota(Quota quota) {
+    @Override
+    public void createGroupQuota(Quota quota)
+    {
         sqlDriver.createGroupQuota(quota);
     }
 
+    @Override
     public boolean checkUserQuota(int uid, RetentionPolicy rp)
     {
         Quota quota = userQuotas.get(uid);
         if (quota == null)  {
-            LOGGER.info("Failed to find user quota for {}", uid);
             return true;
         } else {
-            LOGGER.info("Found group quota for {} {} {}", quota.getId(), quota.getCustodialSpaceLimit(), quota.getReplicaSpaceLimit());
             return quota.check(rp);
         }
     }
 
+    @Override
     public boolean checkGroupQuota(int gid, RetentionPolicy rp)
     {
         Quota quota = groupQuotas.get(gid);
         if (quota == null)  {
-            LOGGER.info("Failed to find group quota for {}", gid);
             return true;
         } else {
-            LOGGER.info("Found group quota for {} {} {}", quota.getId(), quota.getCustodialSpaceLimit(), quota.getReplicaSpaceLimit());
             return quota.check(rp);
         }
     }
 
+    @Override
     public void refreshUserQuotas()
     {
         Map<Integer, Quota> tmp = sqlDriver.getUserQuotas();
@@ -88,6 +155,7 @@ public class JdbcQuota {
         }
     }
 
+    @Override
     public void refreshGroupQuotas()
     {
         Map<Integer, Quota> tmp = sqlDriver.getGroupQuotas();
@@ -96,11 +164,15 @@ public class JdbcQuota {
         }
     }
 
-    public void updateUserQuotas() {
+    @Override
+    public void updateUserQuotas()
+    {
         sqlDriver.updateUserQuota();
     }
 
-    public void updateGroupQuotas() {
+    @Override
+    public void updateGroupQuotas()
+    {
         sqlDriver.updateGroupQuota();
     }
 }

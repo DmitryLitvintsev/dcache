@@ -11,6 +11,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import diskCacheV111.util.*;
 import org.apache.curator.framework.recipes.leader.LeaderLatchListener;
 import org.dcache.chimera.quota.Quota;
+import org.dcache.chimera.quota.QuotaHandler;
 import org.dcache.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +152,9 @@ public class PnfsManagerV3
 
     private ScheduledFuture<?> updateGroupQuotaFuture;
     private ScheduledFuture<?> updateUserQuotaFuture;
+    private TimeUnit updateQuotaIntervalUnit;
+    private long updateQuotaInterval;
+    private boolean quotaEnabled;
 
 
     /**
@@ -243,6 +247,24 @@ public class PnfsManagerV3
     public void setUpdateFsStatIntervalUnit(TimeUnit updateFsStatIntervalUnit)
     {
         this.updateFsStatIntervalUnit = updateFsStatIntervalUnit;
+    }
+
+    @Required
+    public void setUpdateQuotaInterval(long updateQuotaInterval)
+    {
+        this.updateQuotaInterval = updateQuotaInterval;
+    }
+
+    @Required
+    public void setUpdateQuotaIntervalUnit(TimeUnit updateQuotaIntervalUnit)
+    {
+        this.updateQuotaIntervalUnit = updateQuotaIntervalUnit;
+    }
+
+    @Required
+    public void setQuotaEnabled(boolean quotaEnabled)
+    {
+        this.quotaEnabled = quotaEnabled;
     }
 
     @Required
@@ -351,13 +373,12 @@ public class PnfsManagerV3
     }
 
     @Required
-    public JdbcQuota getQuotaSystem()
+    public QuotaHandler getQuotaSystem()
     {
         return quotaSystem;
     }
 
-    public void init()
-    {
+    public void init() {
         _stub = new CellStub(getCellEndpoint());
 
         _fifos = new BlockingQueue[_threads];
@@ -382,30 +403,32 @@ public class PnfsManagerV3
             executor.execute(t);
         }
 
-        ScheduledFuture<?>  refreshUserQuota = scheduledExecutor.
-                scheduleWithFixedDelay(
-                        new FireAndForgetTask(new Runnable() {
-                            @Override
-                            public void run() {
+        if (quotaEnabled) {
+            ScheduledFuture<?> refreshUserQuota = scheduledExecutor.
+                    scheduleWithFixedDelay(
+                            new FireAndForgetTask(new Runnable() {
+                                @Override
+                                public void run() {
                                     quotaSystem.refreshUserQuotas();
-                            }
-                        }),
-                        10,
-                        10000,
-                        TimeUnit.MILLISECONDS);
+                                }
+                            }),
+                            10000,
+                            60000,
+                            TimeUnit.MILLISECONDS);
 
-        ScheduledFuture<?>  refreshGroupQuota = scheduledExecutor.
-                scheduleWithFixedDelay(
-                        new FireAndForgetTask(new Runnable() {
-                            @Override
-                            public void run() {
+            ScheduledFuture<?> refreshGroupQuota = scheduledExecutor.
+                    scheduleWithFixedDelay(
+                            new FireAndForgetTask(new Runnable() {
+                                @Override
+                                public void run() {
                                     quotaSystem.refreshGroupQuotas();
-                            }
-                        }),
-                        10,
-                        10000,
-                        TimeUnit.MILLISECONDS);
+                                }
+                            }),
+                            10000,
+                            60000,
+                            TimeUnit.MILLISECONDS);
 
+        }
     }
 
     public void shutdown() throws InterruptedException
@@ -455,38 +478,41 @@ public class PnfsManagerV3
                                    updateFsStatIntervalUnit.toMillis(updateFsStatInterval),
                                    TimeUnit.MILLISECONDS);
 
-        updateGroupQuotaFuture = scheduledExecutor.
-                scheduleWithFixedDelay(
-                        new FireAndForgetTask(new Runnable() {
-                            @Override
-                            public void run() {
-                                quotaSystem.updateGroupQuotas();
-                            }
-                        }),
-                        100000,
-                        3600000,
-                        TimeUnit.MILLISECONDS);
+        if (quotaEnabled) {
+            updateGroupQuotaFuture = scheduledExecutor.
+                    scheduleWithFixedDelay(
+                            new FireAndForgetTask(new Runnable() {
+                                @Override
+                                public void run() {
+                                    quotaSystem.updateGroupQuotas();
+                                }
+                            }),
+                            100000,
+                            updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
+                            TimeUnit.MILLISECONDS);
 
-        updateUserQuotaFuture = scheduledExecutor.
-                scheduleWithFixedDelay(
-                        new FireAndForgetTask(new Runnable() {
-                            @Override
-                            public void run() {
-                                quotaSystem.updateUserQuotas();
-                            }
-                        }),
-                        100000,
-                        3600000,
-                        TimeUnit.MILLISECONDS);
+            updateUserQuotaFuture = scheduledExecutor.
+                    scheduleWithFixedDelay(
+                            new FireAndForgetTask(new Runnable() {
+                                @Override
+                                public void run() {
+                                    quotaSystem.updateUserQuotas();
+                                }
+                            }),
+                            1000000,
+                            updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
+                            TimeUnit.MILLISECONDS);
+        }
     }
 
     @Override
     public void notLeader() {
         updateFsFuture.cancel(true);
-        updateGroupQuotaFuture.cancel(true);
-        updateUserQuotaFuture.cancel(true);
+         if (quotaEnabled) {
+             updateGroupQuotaFuture.cancel(true);
+             updateUserQuotaFuture.cancel(true);
+         }
     }
-
 
     @Override
     public void getInfo( PrintWriter pw ){
@@ -908,6 +934,9 @@ public class PnfsManagerV3
 
         @Override
         public String call() throws CacheException {
+            if (!quotaEnabled) {
+                return "Quota is disabled.";
+            }
             Optional<ByteUnit> displayUnit = humanReadable
                     ? Optional.empty()
                     : Optional.of(ByteUnit.BYTES);
@@ -968,6 +997,9 @@ public class PnfsManagerV3
 
         @Override
         public String call() throws CacheException {
+            if (!quotaEnabled) {
+                return "Quota is disabled.";
+            }
             Optional<ByteUnit> displayUnit = humanReadable
                     ? Optional.empty()
                     : Optional.of(ByteUnit.BYTES);
@@ -1022,19 +1054,25 @@ public class PnfsManagerV3
         int uid;
 
         @Option(name = "custodial",
-                usage = "Specify custodial user quota in bytes; \"null\" value removes quota.")
+                usage = "Specify custodial user quota in bytes, with optional byte unit suffix "+
+                    "using either SI or IEEE 1541 prefixes. \"null\" value removes quota.")
         String custodial;
 
         @Option(name = "replica",
-                usage = "Specify replica user quota in bytes; \"null\" value removes quota.")
+                usage = "Specify replica user quota in bytes, with optional byte unit suffix "+
+                    "using either SI or IEEE 1541 prefixes.  \"null\" value removes quota.")
         String replica;
 
         @Option(name = "output",
-                usage = "Specify output user quota in bytes; \"null\" value removes quota.")
+                usage = "Specify output user quota in bytes, with optional byte unit suffix "+
+                    "using either SI or IEEE 1541 prefixes. \"null\" value removes quota.")
         String output;
 
         @Override
         public String call() throws CacheException {
+            if (!quotaEnabled) {
+                return "Quota is disabled.";
+            }
             if (custodial == null &&
                     replica == null &&
                     output == null) {
@@ -1047,33 +1085,14 @@ public class PnfsManagerV3
                 quota = new Quota(uid, 0, null,
                         0, null, 0, null);
                 quotaSystem.createUserQuota(quota);
-            } else {
-                furnishQuota(quota);
-                quotaSystem.setUserQuota(quota);
             }
-            return "OK";
-        }
-
-        private void furnishQuota(Quota q) {
-            if (custodial != null) {
-                Long custodialLimit = custodial.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(custodial);
-                q.setCustodialSpaceLimit(custodialLimit);
-            }
-            if (replica != null) {
-                Long replicaLimit = replica.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(replica);
-                q.setReplicaSpaceLimit(replicaLimit);
-            }
-            if (output != null) {
-                Long outputLimit = output.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(output);
-                q.setOutputSpaceLimit(outputLimit);
-            }
+            Quota.furnishQuota(quota, custodial, output, replica);
+            quotaSystem.setUserQuota(quota);
+            return quota.toString();
         }
     }
 
-        @Command(name = "set group quota",
+    @Command(name = "set group quota",
             hint = "Set group quota",
             description = "Set group quota")
 
@@ -1098,7 +1117,9 @@ public class PnfsManagerV3
 
         @Override
         public String call() throws CacheException {
-
+            if (!quotaEnabled) {
+                return "Quota is disabled.";
+            }
             if (custodial == null &&
                     replica == null &&
                     output == null) {
@@ -1111,34 +1132,12 @@ public class PnfsManagerV3
                 quota = new Quota(gid, 0, null,
                         0, null, 0, null);
                 quotaSystem.createGroupQuota(quota);
-            } else {
-                furnishQuota(quota);
-                quotaSystem.setGroupQuota(quota);
             }
-            return "OK";
-        }
-
-        private void furnishQuota(Quota q) {
-            if (custodial != null) {
-                Long custodialLimit = custodial.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(custodial);
-                q.setCustodialSpaceLimit(custodialLimit);
-            }
-            if (replica != null) {
-                Long replicaLimit = replica.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(replica);
-                q.setReplicaSpaceLimit(replicaLimit);
-            }
-            if (output != null) {
-                Long outputLimit = output.equalsIgnoreCase("null") ?
-                        null : Long.valueOf(output);
-                q.setOutputSpaceLimit(outputLimit);
-            }
+            Quota.furnishQuota(quota, custodial, output, replica);
+            quotaSystem.setGroupQuota(quota);
+            return quota.toString();
         }
     }
-
-
-
 
     public static final String hh_add_file_cache_location = "<pnfsid> <pool name>";
     public String ac_add_file_cache_location_$_2(Args args) throws Exception {
@@ -1802,26 +1801,33 @@ public class PnfsManagerV3
 
             case REGULAR:
                 _log.info("create file {}", path);
-                String parentPath = file.getParent();
-                PnfsId parentPnfsId = _nameSpaceProvider.pathToPnfsid(ROOT, parentPath, false);
-		
-                FileAttributes parentAttributes =
-                        _nameSpaceProvider.getFileAttributes(ROOT, parentPnfsId,
-                                EnumSet.of(FileAttribute.ACCESS_LATENCY,
-                                        FileAttribute.RETENTION_POLICY));
+                if (quotaEnabled) {
+                    RetentionPolicy rp = assign.getRetentionPolicyIfPresent().orElse(null);
+                    if (rp == null) {
+                        String parentPath = file.getParent();
+                        PnfsId parentPnfsId = _nameSpaceProvider.pathToPnfsid(ROOT, parentPath, false);
+                        FileAttributes parentAttributes =
+                                _nameSpaceProvider.getFileAttributes(ROOT, parentPnfsId,
+                                        EnumSet.of(FileAttribute.ACCESS_LATENCY,
+                                                FileAttribute.RETENTION_POLICY));
 
-                RetentionPolicy rp = parentAttributes.getRetentionPolicyIfPresent().orElse(null);
-                int uid = assign.getOwnerIfPresent().orElse(-1);
-                int gid = assign.getGroupIfPresent().orElse(-1);
-                if (!quotaSystem.checkGroupQuota(gid, rp)) {
-                    throw new GroupQuotaCacheException(String.format("%s group quota exceeded for gid=%d", rp, gid));
-                }
+                        rp = parentAttributes.getRetentionPolicyIfPresent().orElse(null);
+                        if (rp != null) {
+                            int uid = assign.getOwnerIfPresent().orElse(-1);
+                            int gid = assign.getGroupIfPresent().orElse(-1);
+                            if (!quotaSystem.checkGroupQuota(gid, rp)) {
+                                throw new GroupQuotaCacheException(String.format("%s group quota exceeded for gid=%d", rp, gid));
+                            }
 
-                if (!quotaSystem.checkUserQuota(uid, rp)) {
-                    throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, gid));
+                            if (!quotaSystem.checkUserQuota(uid, rp)) {
+                                throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, gid));
+                            }
+                        } else {
+                            _log.warn("Quota check skipped: quota is enabled, but can't determine RetentionPolicy of file {}.", path);
+                        }
+                    }
                 }
                 checkRestriction(pnfsMessage, UPLOAD);
-
                 requested.add(FileAttribute.STORAGEINFO);
                 requested.add(FileAttribute.PNFSID);
 

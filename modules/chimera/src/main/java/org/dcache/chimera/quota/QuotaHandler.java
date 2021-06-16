@@ -58,35 +58,76 @@ obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
 */
 
-package org.dcache.chimera.quota.spi;
+package org.dcache.chimera.quota;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import javax.sql.DataSource;
-import org.dcache.chimera.quota.QuotaSqlDriver;
-import org.dcache.chimera.quota.PgsqlQuotaSqlDriver;
-import static org.dcache.util.SqlHelper.tryToClose;
+import diskCacheV111.util.RetentionPolicy;
 
-public class PgsqlDbDriverProvider implements DbDriverProvider {
+import java.util.Map;
 
-    @Override
-    public boolean isSupportDB(DataSource dataSource)
-            throws SQLException
-    {
-        Connection dbConnection = null;
-        try {
-            dbConnection = dataSource.getConnection();
-            String databaseProductName = dbConnection.getMetaData().getDatabaseProductName();
-            return databaseProductName.equalsIgnoreCase("PostgreSQL");
-        } finally {
-            tryToClose(dbConnection);
-        }
-    }
+public interface QuotaHandler {
 
-    @Override
-    public QuotaSqlDriver getDriver(DataSource dataSource)
-            throws SQLException
-    {
-        return new PgsqlQuotaSqlDriver(dataSource);
-    }
+    /**
+     * Returns uid, Quota map of all known UIDs
+     * @return Map of (uid, quota)
+     */
+    Map<Integer, Quota> getUserQuotas();
+
+    /**
+     * Returns map gid, Quota map of all known GIDs
+     * @return Map of (gid, quota)
+     */
+    Map<Integer, Quota> getGroupQuotas();
+
+    /**
+     * Set quota numbers for a given user quota
+     */
+    void setUserQuota(Quota quota);
+
+    /**
+     * Set quota numbers for a given group quota
+     */
+    void setGroupQuota(Quota quota);
+
+    /**
+     * Create new user quota on the backend
+     */
+    void createUserQuota(Quota quota);
+
+    /**
+     * Create new group quota on the backend
+     */
+    void createGroupQuota(Quota quota);
+
+    /**
+     * Check if user with UID has exceeded their quotas
+     * @return boolean
+     */
+    boolean checkUserQuota(int uid, RetentionPolicy rp);
+
+    /**
+     * Check if user with GID has exceeded their quotas
+     * @return boolean
+     */
+    boolean checkGroupQuota(int gid, RetentionPolicy rp);
+
+    /**
+     * Refresh in memory user quota map from the backend
+     */
+    void refreshUserQuotas();
+
+    /**
+     * Update user quota on the backend
+     */
+    void updateUserQuotas();
+
+    /**
+     * Refresh in memory group quota map from the backend
+     */
+    void refreshGroupQuotas();
+
+    /**
+     * Update user quota on the backend
+     */
+    void updateGroupQuotas();
+
 }

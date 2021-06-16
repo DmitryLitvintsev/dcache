@@ -58,35 +58,24 @@ obligated to secure any necessary Government licenses before exporting
 documents or software obtained from this server.
 */
 
-package org.dcache.chimera.quota.spi;
+package org.dcache.util;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import javax.sql.DataSource;
-import org.dcache.chimera.quota.QuotaSqlDriver;
-import org.dcache.chimera.quota.PgsqlQuotaSqlDriver;
-import static org.dcache.util.SqlHelper.tryToClose;
+import static org.dcache.util.ByteUnits.isoPrefix;
 
-public class PgsqlDbDriverProvider implements DbDriverProvider {
+public final class ArgumentHandler {
 
-    @Override
-    public boolean isSupportDB(DataSource dataSource)
-            throws SQLException
+    public static long parseByteQuantity(String arg)
     {
-        Connection dbConnection = null;
-        try {
-            dbConnection = dataSource.getConnection();
-            String databaseProductName = dbConnection.getMetaData().getDatabaseProductName();
-            return databaseProductName.equalsIgnoreCase("PostgreSQL");
-        } finally {
-            tryToClose(dbConnection);
+        String s = arg.endsWith("B") ? arg.substring(0, arg.length()-1) : arg;
+        return checkNonNegative(ByteSizeParser.using(isoPrefix()).parse(s));
+    }
+
+    public static long checkNonNegative(long size)
+    {
+        if (size < 0L) {
+            throw new IllegalArgumentException("Size must be non-negative.");
         }
+        return size;
     }
 
-    @Override
-    public QuotaSqlDriver getDriver(DataSource dataSource)
-            throws SQLException
-    {
-        return new PgsqlQuotaSqlDriver(dataSource);
-    }
 }
