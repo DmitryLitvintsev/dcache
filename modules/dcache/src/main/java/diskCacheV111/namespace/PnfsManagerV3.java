@@ -1809,18 +1809,26 @@ public class PnfsManagerV3
                         FileAttributes parentAttributes =
                                 _nameSpaceProvider.getFileAttributes(ROOT, parentPnfsId,
                                         EnumSet.of(FileAttribute.ACCESS_LATENCY,
-                                                FileAttribute.RETENTION_POLICY));
+                                                FileAttribute.RETENTION_POLICY,
+                                                FileAttribute.OWNER,
+                                                FileAttribute.OWNER_GROUP));
 
                         rp = parentAttributes.getRetentionPolicyIfPresent().orElse(null);
                         if (rp != null) {
-                            int uid = assign.getOwnerIfPresent().orElse(-1);
-                            int gid = assign.getGroupIfPresent().orElse(-1);
+                            /**
+                             * If ownership is inherited from parent, we count quota for authenticated
+                             * users against their own UID and GID.
+                             */
+                            int uid = assign.getOwnerIfPresent().orElse(Subjects.isNobody(subject) ?
+                                    parentAttributes.getOwner() : (int) Subjects.getUid(subject));
+                            int gid = assign.getGroupIfPresent().orElse(Subjects.isNobody(subject) ?
+                                    parentAttributes.getGroup() : (int) Subjects.getPrimaryGid(subject));
+                            _log.info("Checking quota for {} {} {}", uid, gid, rp);
                             if (!quotaSystem.checkGroupQuota(gid, rp)) {
                                 throw new GroupQuotaCacheException(String.format("%s group quota exceeded for gid=%d", rp, gid));
                             }
-
                             if (!quotaSystem.checkUserQuota(uid, rp)) {
-                                throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, gid));
+                                throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, uid));
                             }
                         } else {
                             _log.warn("Quota check skipped: quota is enabled, but can't determine RetentionPolicy of file {}.", path);
