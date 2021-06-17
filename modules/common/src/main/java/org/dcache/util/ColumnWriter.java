@@ -478,7 +478,7 @@ public class ColumnWriter
         public int width(Object rawValue)
         {
             if (rawValue == null) {
-		if (nullValue!=null) { 
+		if (nullValue!=null) {
 		    return nullValue.length();
 		} else  {
 		    return 0;

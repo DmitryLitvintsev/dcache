@@ -154,7 +154,7 @@ public class QuotaSqlDriver {
 					"(igid, icustodial_used, ioutput_used, ireplica_used) "+
 					"VALUES (t.igid, t.custodial, t.output, t.replica)";
     /**
-       Update group quotas 
+       Update group quotas
      */
     public void updateGroupQuota() {
 		try {
@@ -163,7 +163,7 @@ public class QuotaSqlDriver {
 			LOGGER.error("Failed to update group quotas {}", e.getMessage());
 		}
     }
-    
+
     private static final String SELECT_USER_QUOTAS_SQL =
 			"SELECT iuid, "+
 					"icustodial_used, icustodial_limit, "+

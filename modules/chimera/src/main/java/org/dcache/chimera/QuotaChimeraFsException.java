@@ -4,7 +4,7 @@ public class QuotaChimeraFsException extends ChimeraFsException {
 
     private static final long serialVersionUID = 1L;
 
-    
+
     public QuotaChimeraFsException() {
         super();
     }

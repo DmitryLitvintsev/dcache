@@ -88,7 +88,7 @@ public class JdbcQuota implements QuotaHandler {
     private final ScheduledExecutorService  _quotaRefreshExecutor = Executors.newScheduledThreadPool(2,
             new ThreadFactoryBuilder().setNameFormat("quota-refresh-%d").build());
 
-   
+
     public JdbcQuota(DataSource ds)
             throws SQLException {
         sqlDriver = QuotaSqlDriver.getDriverInstance(ds);
