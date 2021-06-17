@@ -60,15 +60,21 @@ documents or software obtained from this server.
 
 package org.dcache.chimera.quota;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import diskCacheV111.util.RetentionPolicy;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
+import diskCacheV111.util.RetentionPolicy;
+
+import org.dcache.util.FireAndForgetTask;
 
 public class JdbcQuota implements QuotaHandler {
 
@@ -79,6 +85,9 @@ public class JdbcQuota implements QuotaHandler {
     private volatile Map<Integer, Quota> userQuotas;
     private volatile Map<Integer, Quota> groupQuotas;
 
+    private final ScheduledExecutorService  _quotaRefreshExecutor = Executors.newScheduledThreadPool(2,
+            new ThreadFactoryBuilder().setNameFormat("quota-refresh-%d").build());
+
    
     public JdbcQuota(DataSource ds)
             throws SQLException
@@ -86,7 +95,32 @@ public class JdbcQuota implements QuotaHandler {
         sqlDriver = QuotaSqlDriver.getDriverInstance(ds);
         userQuotas = sqlDriver.getUserQuotas();
         groupQuotas = sqlDriver.getGroupQuotas();
+
+        ScheduledFuture<?> refreshUserQuota = _quotaRefreshExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                refreshUserQuotas();
+                            }
+                        }),
+                        60000,
+                        60000,
+                        TimeUnit.MILLISECONDS);
+
+        ScheduledFuture<?> refreshGroupQuota = _quotaRefreshExecutor.
+                scheduleWithFixedDelay(
+                        new FireAndForgetTask(new Runnable() {
+                            @Override
+                            public void run() {
+                                refreshGroupQuotas();
+                            }
+                        }),
+                        60000,
+                        60000,
+                        TimeUnit.MILLISECONDS);
     }
+
 
     @Override
     public Map<Integer, Quota> getUserQuotas()

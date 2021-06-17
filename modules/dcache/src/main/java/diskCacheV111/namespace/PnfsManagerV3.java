@@ -402,33 +402,6 @@ public class PnfsManagerV3
             _listProcessThreads.add(t);
             executor.execute(t);
         }
-
-        if (quotaEnabled) {
-            ScheduledFuture<?> refreshUserQuota = scheduledExecutor.
-                    scheduleWithFixedDelay(
-                            new FireAndForgetTask(new Runnable() {
-                                @Override
-                                public void run() {
-                                    quotaSystem.refreshUserQuotas();
-                                }
-                            }),
-                            10000,
-                            60000,
-                            TimeUnit.MILLISECONDS);
-
-            ScheduledFuture<?> refreshGroupQuota = scheduledExecutor.
-                    scheduleWithFixedDelay(
-                            new FireAndForgetTask(new Runnable() {
-                                @Override
-                                public void run() {
-                                    quotaSystem.refreshGroupQuotas();
-                                }
-                            }),
-                            10000,
-                            60000,
-                            TimeUnit.MILLISECONDS);
-
-        }
     }
 
     public void shutdown() throws InterruptedException
@@ -436,6 +409,7 @@ public class PnfsManagerV3
         drainQueues(_fifos);
         drainQueue(_listQueue);
         MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
+        MoreExecutors.shutdownAndAwaitTermination(scheduledExecutor, 1, TimeUnit.SECONDS);
     }
 
     private void drainQueues(BlockingQueue<CellMessage>[] queues)
@@ -1801,40 +1775,6 @@ public class PnfsManagerV3
 
             case REGULAR:
                 _log.info("create file {}", path);
-                if (quotaEnabled) {
-                    RetentionPolicy rp = assign.getRetentionPolicyIfPresent().orElse(null);
-                    if (rp == null) {
-                        String parentPath = file.getParent();
-                        PnfsId parentPnfsId = _nameSpaceProvider.pathToPnfsid(ROOT, parentPath, false);
-                        FileAttributes parentAttributes =
-                                _nameSpaceProvider.getFileAttributes(ROOT, parentPnfsId,
-                                        EnumSet.of(FileAttribute.ACCESS_LATENCY,
-                                                FileAttribute.RETENTION_POLICY,
-                                                FileAttribute.OWNER,
-                                                FileAttribute.OWNER_GROUP));
-
-                        rp = parentAttributes.getRetentionPolicyIfPresent().orElse(null);
-                        if (rp != null) {
-                            /**
-                             * If ownership is inherited from parent, we count quota for authenticated
-                             * users against their own UID and GID.
-                             */
-                            int uid = assign.getOwnerIfPresent().orElse(Subjects.isNobody(subject) ?
-                                    parentAttributes.getOwner() : (int) Subjects.getUid(subject));
-                            int gid = assign.getGroupIfPresent().orElse(Subjects.isNobody(subject) ?
-                                    parentAttributes.getGroup() : (int) Subjects.getPrimaryGid(subject));
-                            _log.info("Checking quota for {} {} {}", uid, gid, rp);
-                            if (!quotaSystem.checkGroupQuota(gid, rp)) {
-                                throw new GroupQuotaCacheException(String.format("%s group quota exceeded for gid=%d", rp, gid));
-                            }
-                            if (!quotaSystem.checkUserQuota(uid, rp)) {
-                                throw new UserQuotaCacheException(String.format("%s user quota exceeded for uid=%d", rp, uid));
-                            }
-                        } else {
-                            _log.warn("Quota check skipped: quota is enabled, but can't determine RetentionPolicy of file {}.", path);
-                        }
-                    }
-                }
                 checkRestriction(pnfsMessage, UPLOAD);
                 requested.add(FileAttribute.STORAGEINFO);
                 requested.add(FileAttribute.PNFSID);

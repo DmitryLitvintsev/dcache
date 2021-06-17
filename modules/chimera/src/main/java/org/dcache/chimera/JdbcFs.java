@@ -22,6 +22,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import diskCacheV111.util.RetentionPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -50,10 +52,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 
 import org.dcache.acl.ACE;
 import org.dcache.acl.enums.RsType;
 import org.dcache.chimera.posix.Stat;
+import org.dcache.chimera.quota.JdbcQuota;
+import org.dcache.chimera.quota.QuotaHandler;
+
 import org.dcache.chimera.store.InodeStorageInformation;
 import org.dcache.util.Checksum;
 
@@ -149,6 +155,8 @@ public class JdbcFs implements FileSystemProvider {
                     .maximumSize(100000)
                     .build();
 
+    private QuotaHandler _quota;
+
     /**
      * current fs id
      */
@@ -181,6 +189,7 @@ public class JdbcFs implements FileSystemProvider {
 
         // try to get database dialect specific query engine
         _sqlDriver = FsSqlDriver.getDriverInstance(dataSource);
+        _quota = new JdbcQuota(dataSource);
     }
 
     private FsInode getWormID() throws ChimeraFsException {
@@ -398,6 +407,23 @@ public class JdbcFs implements FileSystemProvider {
                 }
 
                 int gid = (parentStat.getMode() & UnixPermission.S_ISGID) != 0 ? parentStat.getGid() : group;
+		
+                Stat tagStat = statTag(parent, "RetentionPolicy");
+                byte[] data = new byte[(int) tagStat.getSize()];
+                getTag(parent, "RetentionPolicy", data, 0, data.length);
+                RetentionPolicy rp = RetentionPolicy.valueOf(new String(data));
+                //RetentionPolicy rp = parentStat.getRetentionPolicy();
+                if (rp != null) {
+                    LOGGER.info("Checking quota for {} {} {}", owner, gid, rp);
+                    if (!_quota.checkGroupQuota(gid, rp)) {
+                        throw new GroupQuotaChimeraFsException(String.format("%s group quota exceeded for gid=%d", rp, gid));
+                    }
+                    if (!_quota.checkUserQuota(owner, rp)) {
+                        throw new UserQuotaChimeraFsException(String.format("%s user quota exceeded for uid=%d", rp, owner));
+                    }
+                } else {
+                    LOGGER.warn("Quota check skipped: quota is enabled, but can't determine RetentionPolicy of file {}.", name);
+                }
                 FsInode inode = _sqlDriver.createFile(parent, name, owner, gid, mode, type);
                 _sqlDriver.copyAcl(parent, inode, RsType.FILE,
                                    EnumSet.of(INHERIT_ONLY_ACE, DIRECTORY_INHERIT_ACE, FILE_INHERIT_ACE),
@@ -438,6 +464,22 @@ public class JdbcFs implements FileSystemProvider {
                 }
                 Stat stat = parent.statCache();
                 int gid = (stat.getMode() & UnixPermission.S_ISGID) != 0 ? stat.getGid() : group;
+                Stat tagStat = statTag(parent, "RetentionPolicy");
+                byte[] data = new byte[(int) tagStat.getSize()];
+                getTag(parent, "RetentionPolicy", data, 0, data.length);
+                RetentionPolicy rp = RetentionPolicy.valueOf(new String(data));
+                //RetentionPolicy rp = stat.getRetentionPolicy();
+                if (rp != null) {
+                    LOGGER.info("Checking quota for {} {} {}", owner, gid, rp);
+                    if (!_quota.checkGroupQuota(gid, rp)) {
+                        throw new GroupQuotaChimeraFsException(String.format("%s group quota exceeded for gid=%d", rp, gid));
+                    }
+                    if (!_quota.checkUserQuota(owner, rp)) {
+                        throw new UserQuotaChimeraFsException(String.format("%s user quota exceeded for uid=%d", rp, owner));
+                    }
+                } else {
+                    LOGGER.warn("Quota check skipped: quota is enabled, but can't determine RetentionPolicy of file {}.", name);
+                }
                 FsInode inode = _sqlDriver.createFileWithId(parent, id, name, owner, gid, mode, type);
                 _sqlDriver.copyAcl(parent, inode, RsType.FILE,
                                    EnumSet.of(INHERIT_ONLY_ACE, DIRECTORY_INHERIT_ACE, FILE_INHERIT_ACE),
@@ -1490,4 +1532,17 @@ public class JdbcFs implements FileSystemProvider {
             return null;
         }
     }
+
+    protected static Optional<String> getFirstLine(List<String> lines)
+    {
+        if (!lines.isEmpty()) {
+            String line = lines.get(0).trim();
+            if (!line.isEmpty()) {
+                return Optional.of(line);
+            }
+        }
+        return Optional.empty();
+    }
+
 }
+

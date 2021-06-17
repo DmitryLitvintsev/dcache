@@ -60,9 +60,11 @@ documents or software obtained from this server.
 
 package org.dcache.chimera.quota;
 
-import diskCacheV111.util.RetentionPolicy;
+
 
 import java.util.Map;
+
+import diskCacheV111.util.RetentionPolicy;
 
 public interface QuotaHandler {
 
