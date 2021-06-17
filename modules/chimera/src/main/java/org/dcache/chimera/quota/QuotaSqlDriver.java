@@ -89,21 +89,21 @@ public class QuotaSqlDriver {
     final JdbcTemplate jdbc;
 
     public QuotaSqlDriver(DataSource dataSource)
-	{
-    	jdbc = new JdbcTemplate(dataSource);
+    {
+        jdbc = new JdbcTemplate(dataSource);
     }
 
-	public static QuotaSqlDriver getDriverInstance(DataSource dataSource)
-			throws SQLException
+    public static QuotaSqlDriver getDriverInstance(DataSource dataSource)
+        throws SQLException
     {
-  		for (DbDriverProvider driverProvider: ALL_PROVIDERS) {
-			if (driverProvider.isSupportDB(dataSource)) {
-				QuotaSqlDriver driver = driverProvider.getDriver(dataSource);
-				LOGGER.info("Using DBDriverProvider for Quota: {}", driver.getClass().getName());
-				return driver;
-			}
-		}
-		return new QuotaSqlDriver(dataSource);
+        for (DbDriverProvider driverProvider: ALL_PROVIDERS) {
+            if (driverProvider.isSupportDB(dataSource)) {
+                QuotaSqlDriver driver = driverProvider.getDriver(dataSource);
+                LOGGER.info("Using DBDriverProvider for Quota: {}", driver.getClass().getName());
+                return driver;
+            }
+        }
+        return new QuotaSqlDriver(dataSource);
     }
 
     private static final String UPDATE_USER_QUOTAS_SQL =
@@ -178,8 +178,8 @@ public class QuotaSqlDriver {
     }
 
     public Map<Integer, Quota> getUserQuotas() {
-    	Map<Integer, Quota> quotas = new HashMap<>();
-    	jdbc.query(SELECT_USER_QUOTAS_SQL,
+        Map<Integer, Quota> quotas = new HashMap<>();
+        jdbc.query(SELECT_USER_QUOTAS_SQL,
 		   (rs) -> {
 		       int id = rs.getInt("iuid");
 		       quotas.put(id,
@@ -191,8 +191,8 @@ public class QuotaSqlDriver {
 						  rs.getLong("ireplica_used"),
 						  bigDecimalToLong(rs.getBigDecimal("ireplica_limit"))));
 		   });
-    	LOGGER.debug("getUserQuotas, found {} records.", quotas.size());
-		return quotas;
+        LOGGER.debug("getUserQuotas, found {} records.", quotas.size());
+        return quotas;
     }
 
     private static final String SELECT_GROUP_QUOTAS_SQL =
@@ -225,7 +225,8 @@ public class QuotaSqlDriver {
 					"icustodial_limit = ?, ioutput_limit = ?, ireplica_limit=? "+
 					"WHERE iuid = ?";
 
-    public void setUserQuota(Quota q) {
+	public void setUserQuota(Quota q)
+	{
 		setQuota(UPDATE_USER_QUOTA_SQL, q);
 	}
 
@@ -234,7 +235,8 @@ public class QuotaSqlDriver {
 					"icustodial_limit = ?, ioutput_limit = ?, ireplica_limit=? "+
 					"WHERE igid = ?";
 
-    public void setGroupQuota(Quota q) {
+    public void setGroupQuota(Quota q)
+	{
 		setQuota(UPDATE_GROUP_QUOTA_SQL, q);
 	}
 
@@ -245,12 +247,14 @@ public class QuotaSqlDriver {
 				q.getReplicaSpaceLimit(),
 				q.getId());
 	}
+
 	private static final String INSERT_USER_QUOTA =
 			"INSERT INTO t_user_quota (iuid, icustodial_used, ioutput_used, ireplica_used, "+
 					"icustodial_limit, ioutput_limit, ireplica_limit) "+
 					"VALUES (?, 0, 0, 0, ?, ?, ?)";
 
-    public void createUserQuota(Quota q) {
+    public void createUserQuota(Quota q)
+	{
 		createQuota(INSERT_USER_QUOTA, q);
 	}
 
@@ -259,7 +263,8 @@ public class QuotaSqlDriver {
 					"icustodial_limit, ioutput_limit, ireplica_limit) "+
 					"VALUES (?, 0, 0, 0, ?, ?, ?)";
 
-    public void createGroupQuota(Quota q) {
+    public void createGroupQuota(Quota q)
+	{
 		createQuota(INSERT_GROUP_QUOTA, q);
 	}
 

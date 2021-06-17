@@ -108,7 +108,7 @@ public class PgsqlQuotaSqlDriver extends QuotaSqlDriver {
 				LOGGER.warn("User quotas update interrupted {}", e.getMessage());
 			}
 		}
- 	}
+        }
 
 	private static final String UPDATE_GROUP_QUOTAS_SQL =
 			"UPDATE t_group_quota SET "+
