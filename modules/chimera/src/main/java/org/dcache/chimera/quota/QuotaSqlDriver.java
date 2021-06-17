@@ -178,7 +178,6 @@ public class QuotaSqlDriver {
     }
 
     public Map<Integer, Quota> getUserQuotas() {
-		LOGGER.info("getUserQuotas");
     	Map<Integer, Quota> quotas = new HashMap<>();
     	jdbc.query(SELECT_USER_QUOTAS_SQL,
 		   (rs) -> {
@@ -192,7 +191,7 @@ public class QuotaSqlDriver {
 						  rs.getLong("ireplica_used"),
 						  bigDecimalToLong(rs.getBigDecimal("ireplica_limit"))));
 		   });
-    	LOGGER.info("getUserQuotas, found {}", quotas.size());
+    	LOGGER.debug("getUserQuotas, found {} records.", quotas.size());
 		return quotas;
     }
 
@@ -205,7 +204,6 @@ public class QuotaSqlDriver {
 
 
 	public Map<Integer, Quota> getGroupQuotas() {
-		LOGGER.info("getGroupQuotas");
 		Map<Integer, Quota> quotas = new HashMap<>();
 		jdbc.query(SELECT_GROUP_QUOTAS_SQL,
 				(rs) -> {
@@ -218,7 +216,7 @@ public class QuotaSqlDriver {
 							rs.getLong("ireplica_used"),
 							bigDecimalToLong(rs.getBigDecimal("ireplica_limit"))));
 				});
-		LOGGER.info("getGroupQuotas, found {}", quotas.size());
+		LOGGER.debug("getGroupQuotas, found {} records.", quotas.size());
 		return quotas;
 	}
 

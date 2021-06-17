@@ -409,7 +409,6 @@ public class PnfsManagerV3
         drainQueues(_fifos);
         drainQueue(_listQueue);
         MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
-        MoreExecutors.shutdownAndAwaitTermination(scheduledExecutor, 1, TimeUnit.SECONDS);
     }
 
     private void drainQueues(BlockingQueue<CellMessage>[] queues)
@@ -461,7 +460,7 @@ public class PnfsManagerV3
                                     quotaSystem.updateGroupQuotas();
                                 }
                             }),
-                            100000,
+                            600000,
                             updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                             TimeUnit.MILLISECONDS);
 
@@ -473,7 +472,7 @@ public class PnfsManagerV3
                                     quotaSystem.updateUserQuotas();
                                 }
                             }),
-                            1000000,
+                            600000,
                             updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                             TimeUnit.MILLISECONDS);
         }
@@ -911,6 +910,7 @@ public class PnfsManagerV3
             if (!quotaEnabled) {
                 return "Quota is disabled.";
             }
+            quotaSystem.refreshGroupQuotas();
             Optional<ByteUnit> displayUnit = humanReadable
                     ? Optional.empty()
                     : Optional.of(ByteUnit.BYTES);
@@ -974,6 +974,7 @@ public class PnfsManagerV3
             if (!quotaEnabled) {
                 return "Quota is disabled.";
             }
+            quotaSystem.refreshUserQuotas();
             Optional<ByteUnit> displayUnit = humanReadable
                     ? Optional.empty()
                     : Optional.of(ByteUnit.BYTES);
@@ -1053,6 +1054,7 @@ public class PnfsManagerV3
                 throw new CacheException("At least one option needs to be specified");
             }
 
+            quotaSystem.refreshUserQuotas();
             Quota quota = quotaSystem.getUserQuotas().get(uid);
 
             if (quota == null) {
@@ -1100,6 +1102,7 @@ public class PnfsManagerV3
                 throw new CacheException("At least one option needs to be specified");
             }
 
+            quotaSystem.refreshGroupQuotas();
             Quota quota = quotaSystem.getGroupQuotas().get(gid);
 
             if (quota == null) {

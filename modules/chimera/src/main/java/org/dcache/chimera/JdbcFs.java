@@ -204,6 +204,9 @@ public class JdbcFs implements FileSystemProvider {
 
     public void setQuotaEnabled(boolean enabled) {
         _quotaEnabled = enabled;
+        if (_quotaEnabled) {
+            _quota.scheduleRefreshQuota();
+        }
     }
 
     public void setDefaultRetentionPolicy(RetentionPolicy rp) {

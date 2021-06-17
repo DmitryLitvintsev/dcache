@@ -90,18 +90,22 @@ public class JdbcQuota implements QuotaHandler {
 
    
     public JdbcQuota(DataSource ds)
-            throws SQLException
-    {
+            throws SQLException {
         sqlDriver = QuotaSqlDriver.getDriverInstance(ds);
         userQuotas = sqlDriver.getUserQuotas();
         groupQuotas = sqlDriver.getGroupQuotas();
+    }
 
+    public void scheduleRefreshQuota() {
         ScheduledFuture<?> refreshUserQuota = _quotaRefreshExecutor.
                 scheduleWithFixedDelay(
                         new FireAndForgetTask(new Runnable() {
                             @Override
                             public void run() {
-                                refreshUserQuotas();
+                                try {
+                                    refreshUserQuotas();
+                                } catch(Exception ignore) {
+                                }
                             }
                         }),
                         60000,
@@ -113,7 +117,10 @@ public class JdbcQuota implements QuotaHandler {
                         new FireAndForgetTask(new Runnable() {
                             @Override
                             public void run() {
-                                refreshGroupQuotas();
+                                try {
+                                    refreshGroupQuotas();
+                                } catch (Exception ignore) {
+                                }
                             }
                         }),
                         60000,
@@ -183,6 +190,7 @@ public class JdbcQuota implements QuotaHandler {
     @Override
     public void refreshUserQuotas()
     {
+        LOGGER.debug("Running refreshUserQuotas.");
         Map<Integer, Quota> tmp = sqlDriver.getUserQuotas();
         synchronized (this) {
             userQuotas = tmp;
@@ -192,6 +200,7 @@ public class JdbcQuota implements QuotaHandler {
     @Override
     public void refreshGroupQuotas()
     {
+        LOGGER.debug("Running refreshGroupQuotas.");
         Map<Integer, Quota> tmp = sqlDriver.getGroupQuotas();
         synchronized (this) {
             groupQuotas = tmp;
@@ -201,12 +210,14 @@ public class JdbcQuota implements QuotaHandler {
     @Override
     public void updateUserQuotas()
     {
+        LOGGER.info("Running updateUserQuotas.");
         sqlDriver.updateUserQuota();
     }
 
     @Override
     public void updateGroupQuotas()
     {
+        LOGGER.info("Running updateGroupQuotas.");
         sqlDriver.updateGroupQuota();
     }
 }
