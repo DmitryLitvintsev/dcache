@@ -367,7 +367,7 @@ public class PnfsManagerV3
     }
 
     @Required
-    public void setQuotaSystem(JdbcQuota quota) 
+    public void setQuotaSystem(JdbcQuota quota)
     {
         quotaSystem = quota;
     }
