@@ -120,6 +120,9 @@
         <property name="pinManagerStub" ref="pinManagerStub"/>
         <property name="billingStub" ref="billing-stub"/>
 	<property name="queryPnfsManagerOnRename" value="${nfs.enable.pnfsmanager-query-on-move}"/>
+	<property name="quotaEnabled" value="${nfs.enable.quota}"/>
+	<property name="defaultRetentionPolicy" value="#{ T(diskCacheV111.util.RetentionPolicy).getRetentionPolicy('${nfs.default-retention-policy}') }"/>
+
     </bean>
 
     <bean id="export" class="org.dcache.nfs.ExportFile">

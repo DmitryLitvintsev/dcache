@@ -101,6 +101,8 @@
       <description>Chimera</description>
       <constructor-arg ref="data-source"/>
       <constructor-arg ref="tx-manager"/>
+      <property name="quotaEnabled" value="${pnfsmanager.enable.quota}"/>
+      <property name="defaultRetentionPolicy" value="#{ T(diskCacheV111.util.RetentionPolicy).getRetentionPolicy('${pnfsmanager.default-retention-policy}') }"/>
   </bean>
 
   <bean id="quota-system" class="org.dcache.chimera.quota.JdbcQuota" depends-on="liquibase">
