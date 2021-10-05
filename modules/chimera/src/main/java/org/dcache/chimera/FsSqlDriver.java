@@ -1273,16 +1273,16 @@ public class FsSqlDriver {
 
             if (t != null) {
                 int n = _jdbc.update("DELETE FROM t_tags WHERE inumber=? AND itagname=?", id, tagName);
-                if (n > 0) {
-                    decTagNlinkOrRemove(t);
-                }
+            //     if (n > 0) {
+            //         decTagNlinkOrRemove(t);
+            //     }
             }
 
             _jdbc.update("INSERT INTO t_tags (inumber,itagid,isorign,itagname) VALUES (?, ?, 0, ?)",
                      id, tagid, tagName);
         });
 
-        _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + ? WHERE itagid=?", subtrees.size(), tagid);
+        //_jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + ? WHERE itagid=?", subtrees.size(), tagid);
         return subtrees.size();
     }
 
