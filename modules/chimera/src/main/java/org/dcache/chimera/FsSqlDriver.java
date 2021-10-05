@@ -1258,19 +1258,17 @@ public class FsSqlDriver {
                   rs -> rs.next() ? rs.getLong("itagid") : null);
 
             if (t != null) {
-                int n = _jdbc.update("DELETE FROM t_tags WHERE inumber=? AND itagname=?", id,
-                      tagName);
-                if (n > 0) {
-                    decTagNlinkOrRemove(t);
-                }
+                int n = _jdbc.update("DELETE FROM t_tags WHERE inumber=? AND itagname=?", id, tagName);
+            //     if (n > 0) {
+            //         decTagNlinkOrRemove(t);
+            //     }
             }
 
             _jdbc.update("INSERT INTO t_tags (inumber,itagid,isorign,itagname) VALUES (?, ?, 0, ?)",
                   id, tagid, tagName);
         });
 
-        _jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + ? WHERE itagid=?", subtrees.size(),
-              tagid);
+        //_jdbc.update("UPDATE t_tags_inodes SET inlink = inlink + ? WHERE itagid=?", subtrees.size(), tagid);
         return subtrees.size();
     }
 
@@ -1303,7 +1301,6 @@ public class FsSqlDriver {
         //         .forEach(tag -> removeTag(dir, tag));
 
         List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
-                List<Long> ids = _jdbc.queryForList("SELECT itagid FROM t_tags WHERE inumber=?", Long.class, dir.ino());
         if (!ids.isEmpty()) {
             /* Remove the links.
              */
