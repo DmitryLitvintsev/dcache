@@ -92,7 +92,7 @@ public class DelegationHandler implements Delegation
             X509Certificate[] chain = Axis.getCertificateChain().orElseThrow(
                     () -> new DelegationException("User supplied no certificate."));
             subject.getPublicCredentials().add(cf.generateCertPath(asList(chain)));
-            subject.getPrincipals().add(new Origin(InetAddresses.forString(Axis.getRemoteAddress())));
+            subject.getPrincipals().add(new Origin(InetAddresses.forUriString(Axis.getRemoteAddress())));
             return loginStrategy.login(subject).getSubject();
         } catch (CertificateException e) {
             throw new DelegationException("Failed to process certificate chain.");
