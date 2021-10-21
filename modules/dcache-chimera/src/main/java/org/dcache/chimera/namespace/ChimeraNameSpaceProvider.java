@@ -940,7 +940,10 @@ public class ChimeraNameSpaceProvider
                 break;
             case SIZE:
                 stat = inode.statCache();
-                if (stat.getState() != FileState.CREATED) {
+                // REVISIT when we have another way to detect new files
+                ExtendedInode level2 = inode.getLevel(2);
+                boolean isNew = (stat.getSize() == 0) && !level2.exists() && inode.getLocations().isEmpty();
+                if (!isNew) {
                     attributes.setSize(stat.getSize());
                 }
                 break;
@@ -968,18 +971,10 @@ public class ChimeraNameSpaceProvider
                 attributes.setChecksums(Sets.newHashSet(inode.getChecksums()));
                 break;
             case LOCATIONS:
-                stat = inode.statCache();
-                if (stat.getState() != FileState.CREATED) {
-                    attributes.setLocations(Lists.newArrayList(inode.getLocations(StorageGenericLocation.DISK)));
-                } else {
-		    attributes.setLocations(Collections.emptySet());
-		}
+                attributes.setLocations(Lists.newArrayList(inode.getLocations(StorageGenericLocation.DISK)));
                 break;
             case FLAGS:
-                stat = inode.statCache();
-                if (stat.getState() != FileState.CREATED) {
-                    attributes.setFlags(Maps.newHashMap(inode.getFlags()));
-                }
+                attributes.setFlags(Maps.newHashMap(inode.getFlags()));
                 break;
             case SIMPLE_TYPE:
             case TYPE:
