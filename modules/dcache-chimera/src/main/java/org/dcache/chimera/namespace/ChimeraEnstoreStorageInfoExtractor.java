@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExtractor {
 
-    private static final Logger _log = LoggerFactory.getLogger(FsSqlDriver.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChimeraEnstoreStorageInfoExtractor.class);
 
     public ChimeraEnstoreStorageInfoExtractor(AccessLatency defaultAL,
                                               RetentionPolicy defaultRP) {
@@ -44,6 +44,12 @@ public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExt
         try {
             Stat stat = inode.stat();
             boolean isNew = stat.getState() == FileState.CREATED || stat.getState() == FileState.LEGACY && stat.getSize() == 0 && !inode.getLevel(2).exists();
+
+            LOGGER.error("isNew = {}", isNew);
+            LOGGER.error("stat.getState() {}", stat.getState());
+            LOGGER.error("stat.getSize() {}", stat.getSize());
+            LOGGER.error("inode.getLevel(2).exists() {}",inode.getLevel(2).exists());
+
 
             info = (EnstoreStorageInfo) getDirStorageInfo(inode);
             if (!isNew) {
