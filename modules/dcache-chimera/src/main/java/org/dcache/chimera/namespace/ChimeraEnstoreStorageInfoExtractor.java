@@ -2,7 +2,6 @@ package org.dcache.chimera.namespace;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import org.dcache.chimera.FileState;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
@@ -24,13 +23,8 @@ import org.dcache.chimera.ChimeraFsException;
 import org.dcache.chimera.StorageGenericLocation;
 import org.dcache.chimera.posix.Stat;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExtractor {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(ChimeraEnstoreStorageInfoExtractor.class);
 
     public ChimeraEnstoreStorageInfoExtractor(AccessLatency defaultAL,
                                               RetentionPolicy defaultRP) {
@@ -38,54 +32,55 @@ public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExt
     }
 
     @Override
+    protected void checkFlushUpdate(StorageInfo info) throws CacheException {
+        /* No checks needed: Enstore updates the namespace directly. */
+    }
+
+    @Override
     public StorageInfo getFileStorageInfo(ExtendedInode inode) throws CacheException {
         EnstoreStorageInfo info;
-
+        Stat stat;
+        ExtendedInode level2 = inode.getLevel(2);
         try {
-            Stat stat = inode.stat();
-            boolean isNew = stat.getState() == FileState.CREATED || stat.getState() == FileState.LEGACY && stat.getSize() == 0 && !inode.getLevel(2).exists();
-
-            LOGGER.error("isNew = {}", isNew);
-            LOGGER.error("stat.getState() {}", stat.getState());
-            LOGGER.error("stat.getSize() {}", stat.getSize());
-            LOGGER.error("inode.getLevel(2).exists() {}",inode.getLevel(2).exists());
-
-
-            info = (EnstoreStorageInfo) getDirStorageInfo(inode);
-            if (!isNew) {
-                List<String> locations = inode.getLocations(StorageGenericLocation.TAPE);
-                if (!locations.isEmpty()) {
-                    info = new EnstoreStorageInfo(info.getStorageGroup(), info.getFileFamily());
-                    for (String location : locations) {
-                        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(location);
-                        URI uri = builder.build(isEncoded(location)).toUri();
-                        info.addLocation(uri);
-                        String queryString = uri.getQuery();
-                        if (!Strings.isNullOrEmpty(queryString)) {
-                            for (String part : uri.getQuery().split("&")) {
-                                String[] data = part.split("=");
-                                String key = data[0];
-                                String value = (data.length == 2 ? data[1] : "");
-                                switch (key) {
-                                    case "bfid":
-                                        info.setBitfileId(value);
-                                        break;
-                                    case "volume":
-                                        info.setVolume(value);
-                                        break;
-                                    case "location_cookie":
-                                        info.setLocation(value);
-                                        break;
-                                    case "original_name":
-                                        info.setPath(value);
-                                        break;
-                                }
+            List<String> locations = inode.getLocations(StorageGenericLocation.TAPE);
+            EnstoreStorageInfo parentStorageInfo = (EnstoreStorageInfo) getDirStorageInfo(inode);
+            if (locations.isEmpty()) {
+                info = parentStorageInfo;
+            }
+            else {
+                info = new EnstoreStorageInfo(parentStorageInfo.getStorageGroup(),
+                                              parentStorageInfo.getFileFamily());
+                info.setIsNew(false);
+                for(String location: locations) {
+                    UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(location);
+                    URI uri = builder.build(isEncoded(location)).toUri();
+                    info.addLocation(uri);
+                    String queryString = uri.getQuery();
+                    if (!Strings.isNullOrEmpty(queryString)) {
+                        for (String part : uri.getQuery().split("&")) {
+                            String[] data = part.split("=");
+                            String key = data[0];
+                            String value = (data.length == 2 ? data[1] : "");
+                            switch (key) {
+                                case "bfid":
+                                    info.setBitfileId(value);
+                                    break;
+                                case "volume":
+                                    info.setVolume(value);
+                                    break;
+                                case "location_cookie":
+                                    info.setLocation(value);
+                                    break;
+                                case "original_name":
+                                    info.setPath(value);
+                                    break;
                             }
                         }
                     }
                 }
             }
-            info.setIsNew(isNew);
+            stat = inode.stat();
+            info.setIsNew((stat.getSize() == 0) && (!level2.exists()));
         }
         catch (ChimeraFsException e) {
             throw new CacheException(e.getMessage());
