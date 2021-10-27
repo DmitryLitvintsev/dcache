@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.google.gson.GsonBuilder;
 import diskCacheV111.poolManager.CostModuleV1;
 import diskCacheV111.poolManager.PoolMonitorV5;
 import diskCacheV111.poolManager.PoolSelectionUnit;
@@ -143,6 +144,14 @@ public class PoolMonitorTest
     public void testHostFilterForWrite() throws Exception {
         prepareCostModule(false);
         prepareHostExclusion().selectWritePool(0);
+    }
+
+    @Test
+    public void testGsonDeserialization() throws Exception {
+        prepareCostModule(false);
+        Object obj = UniversalSpringCell.serialize(_poolMonitor);
+        new GsonBuilder().serializeSpecialFloatingPointValues().setPrettyPrinting()
+              .disableHtmlEscaping().create().toJson(obj);
     }
 
     private void prepareCostModule(boolean linkPerPool) throws Exception {
