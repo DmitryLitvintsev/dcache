@@ -1146,6 +1146,7 @@
                         <!-- Disable stack-trace trimming as
                              surefire makes bad decisions too often. -->
                         <trimStackTrace>false</trimStackTrace>
+			<argLine>-Dio.netty.leakDetection.level=paranoid</argLine>
                     </configuration>
                 </plugin>
                 <plugin>
