@@ -664,22 +664,21 @@ public class NFSv41Door extends AbstractCellComponent implements
         final stateid4 stateid = Stateids.getCurrentStateidIfNeeded(context, args.loga_stateid);
 
         LayoutDriver layoutDriver = getLayoutDriver(layoutType);
-
-        NFS4Client client = null;
-        CDC cdcContext = CDC.reset(getCellName(), getCellDomainName());
+	
+	final NFS4Client client;
+	if (context.getMinorversion() == 0) {
+	    /* if we need to run proxy-io with NFSv4.0 */
+	    client = context.getStateHandler().getClientIdByStateId(stateid);
+	} else {
+	    client = context.getSession().getClient();
+	}
+	CDC cdcContext = CDC.reset(getCellName(), getCellDomainName());
         try {
 
             FsInode inode = _chimeraVfs.inodeFromBytes(nfsInode.getFileId());
             PnfsId pnfsId = new PnfsId(inode.getId());
 
             deviceid4[] devices;
-
-            if (context.getMinorversion() == 0) {
-                /* if we need to run proxy-io with NFSv4.0 */
-                client = context.getStateHandler().getClientIdByStateId(stateid);
-            } else {
-                client = context.getSession().getClient();
-            }
 
             final NFS4State openStateId = client.state(stateid).getOpenState();
             final NFS4State layoutStateId;
@@ -794,7 +793,7 @@ public class NFSv41Door extends AbstractCellComponent implements
              * after remove as long as it not closed. We violate that requirement
              * in favor of dCache shared state simplicity.
              */
-            Objects.requireNonNull(client).releaseState(stateid);
+	    client.releaseState(stateid);
             throw new StaleException("File is removed", e);
         } catch (CacheException | ChimeraFsException | TimeoutException | ExecutionException e) {
             throw asNfsException(e, LayoutTryLaterException.class);
