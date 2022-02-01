@@ -1104,11 +1104,12 @@ public class NearlineStorageHandler
         {
             FileAttributes fileAttributes = descriptor.getFileAttributes();
             StorageInfo storageInfo = fileAttributes.getStorageInfo().clone();
+	    storageInfo.locations().clear();
+	    storageInfo.isSetAddLocation(true);
             for (URI uri : uris) {
                 try {
                     HsmLocationExtractorFactory.validate(uri);
                     storageInfo.addLocation(uri);
-		    storageInfo.isSetAddLocation(true);
                 } catch (IllegalArgumentException e) {
                     throw new CacheException(2, e.getMessage(), e);
                 }
