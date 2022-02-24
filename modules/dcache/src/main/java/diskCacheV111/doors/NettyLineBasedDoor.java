@@ -64,6 +64,7 @@ import org.dcache.services.login.IdentityResolverFactory;
 import org.dcache.space.ReservationCaches.GetSpaceTokensKey;
 import org.dcache.util.Args;
 import org.dcache.util.BoundedExecutor;
+import org.dcache.util.FireAndForgetTask;
 import org.dcache.util.SequentialExecutor;
 import org.dcache.util.Transfer;
 
@@ -265,7 +266,7 @@ public class NettyLineBasedDoor
                 interpreter.shutdown();
             }
         }
-        kill();
+        executor.execute(new FireAndForgetTask(() -> kill()));
     }
 
     @Override
