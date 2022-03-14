@@ -59,6 +59,8 @@ public class ExceptionUtils {
         switch (e.getRc()) {
             case BROKEN_ON_TAPE:
             case ERROR_IO_DISK:
+            case FILE_IN_CACHE:
+            case FILE_CORRUPTED:		
                 return new NfsIoException(e.getMessage(), e);
             case FILE_NOT_FOUND:
                 return new NoEntException(e.getMessage(), e);
@@ -71,8 +73,6 @@ public class ExceptionUtils {
                 return new NoSpcException(e.getMessage(), e);
             case TIMEOUT:
                 return new DelayException(e.getMessage(), e);
-            case FILE_IN_CACHE:
-                return new NfsIoException(e.getMessage(), e);
             default:
                 return buildNfsException(defaultException, e);
         }
