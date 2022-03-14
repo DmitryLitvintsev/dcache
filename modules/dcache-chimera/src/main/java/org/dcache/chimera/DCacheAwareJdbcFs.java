@@ -294,7 +294,7 @@ public class DCacheAwareJdbcFs extends JdbcFs implements CellIdentityAware {
     @Override
     public void remove(FsInode directory, String name, FsInode inode) throws ChimeraFsException {
         super.remove(directory, name, inode);
-	Subject subject = Subject.getSubject(AccessController.getContext());
+        Subject subject = getSubjectFromContext();
         DoorRequestInfoMessage infoRemove
               = new DoorRequestInfoMessage(myAddress, "remove");
 
