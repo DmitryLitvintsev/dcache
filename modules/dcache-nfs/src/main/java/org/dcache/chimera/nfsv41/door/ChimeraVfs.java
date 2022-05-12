@@ -358,10 +358,12 @@ public class ChimeraVfs implements VirtualFileSystem, AclCheckable {
                 }
 
                 // allow set size only for newly created files
-                // if (_fs.stat(fsInode).getState() != FileState.CREATED) { <- old
-                 if (fsInode.type() == FsInodeType.INODE && chimeraStat.getState() != FileState.CREATED) {
-                     throw new PermException("Can't change size of existing file");
-                 }
+
+                if (fsInode.type() == FsInodeType.INODE
+		    && fsInode.getLevel() == 0 // exclude layer files                                                                       
+		    && chimeraStat.getState() != FileState.CREATED) {
+                    throw new PermException("Can't change size of existing file");
+                }
             }
 
             org.dcache.chimera.posix.Stat chimeraStat = toChimeraStat(stat);
