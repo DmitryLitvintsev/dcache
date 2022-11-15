@@ -958,7 +958,8 @@ public class PoolSelectionUnitV2
             if (unit == null) {
                 return NO_NET;
             }
-            return unit.getCanonicalName();
+            return unit._uGroupList.isEmpty() ? unit.getName() :
+                  unit._uGroupList.keySet().stream().collect(Collectors.joining("-"));
         } finally {
             runlock();
         }
