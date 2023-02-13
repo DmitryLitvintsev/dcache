@@ -514,7 +514,8 @@ public class PinRequestProcessor
                  * previous pin completed then use it. Otherwise abort the
                  * previous pin and create a new one.
                  */
-                if (pin.getState() == PINNED) {
+                if (pin.getState() == PINNED || 
+		    pin.getState() == PINNING) {
                     message.setPin(pin);
                     reply.reply(message);
                     return null;
