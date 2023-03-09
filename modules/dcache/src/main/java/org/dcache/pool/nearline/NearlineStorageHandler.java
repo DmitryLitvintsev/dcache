@@ -1405,7 +1405,7 @@ public class NearlineStorageHandler
 		    : System.currentTimeMillis() +
 		    stickyOnStageDurationUnit.toMillis(stickyOnStageDuration);
 
-		repository.setSticky(pnfsId, 
+		repository.setSticky(pnfsId,
 				     "self",
 				     expiration,
 				     true);
