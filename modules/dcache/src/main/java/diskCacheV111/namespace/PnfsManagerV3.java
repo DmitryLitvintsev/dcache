@@ -217,9 +217,9 @@ public class PnfsManagerV3
     private boolean _canFold;
 
     /**
-     * Queues for list operations. There is one queue per thread group.
+     * Queues for list operations.
      */
-    private BlockingQueue<CellMessage> _listQueue;
+    private BlockingQueue<CellMessage>[] _listQueues;
 
     /**
      * Tasks queues used for messages that do not operate on cache locations.
@@ -429,13 +429,17 @@ public class PnfsManagerV3
             executor.execute(new ProcessThread(_fifos[i]));
         }
 
-        /* Start a seperate queue for list operations.  We use a shared queue,
-         * as list operations are read only and thus there is no need
-         * to serialize the operations.
+        /**
+         * Start separate queues for list operations.
          */
-        _listQueue = new LinkedBlockingQueue<>();
-        for (int j = 0; j < _listThreads; j++) {
-            ProcessThread t = new ProcessThread(_listQueue);
+        _listQueues =  new BlockingQueue[_listThreads];
+         for (int i = 0; i < _listQueues.length; i++) {
+            if (_queueMaxSize > 0) {
+                _listQueues[i] = new LinkedBlockingQueue<>(_queueMaxSize);
+            } else {
+                _listQueues[i] = new LinkedBlockingQueue<>();
+            }
+            ProcessThread t = new ProcessThread(_listQueues[i]);
             _listProcessThreads.add(t);
             executor.execute(t);
         }
@@ -443,7 +447,7 @@ public class PnfsManagerV3
 
     public void shutdown() throws InterruptedException {
         drainQueues(_fifos);
-        drainQueue(_listQueue);
+        drainQueues(_listQueues);
         MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
     }
 
@@ -529,7 +533,9 @@ public class PnfsManagerV3
             pw.println(TimeUnit.MILLISECONDS.toSeconds(_atimeGap));
         }
         pw.println();
-        pw.println("List queue: " + _listQueue.size());
+        pw.println("List queue: "
+                   + Arrays.stream(_listQueues)
+                   .mapToInt(BlockingQueue::size).sum());
         pw.println();
         pw.println("Threads (" + _fifos.length + ") Queue");
         for (int i = 0; i < _fifos.length; i++) {
@@ -1522,9 +1528,17 @@ public class PnfsManagerV3
         public String call() {
             ColumnWriter writer = buildColumnWriter();
 
-            if (!_listQueue.isEmpty()) {
+            int queuedRequests = Arrays.stream(_listQueues)
+                .mapToInt(BlockingQueue::size).sum();
+
+
+            if (queuedRequests > 0) {
                 writer.section("QUEUED REQUESTS");
-                _listQueue.forEach(e -> addRow(writer.row(), e));
+                for (BlockingQueue<CellMessage> queue : _listQueues) {
+                    if (!queue.isEmpty()) {
+                        queue.forEach(e -> addRow(writer.row(), e));
+                    }
+                }
             }
 
             List<ActivityReport> activity = _listProcessThreads.stream()
@@ -2556,11 +2570,15 @@ public class PnfsManagerV3
 
     public void messageArrived(CellMessage envelope, PnfsListDirectoryMessage message)
           throws CacheException {
+
         String path = message.getPnfsPath();
         if (path == null) {
             throw new InvalidMessageCacheException("Missing PNFS id and path");
         }
-        if (!_listQueue.offer(envelope)) {
+
+        int index = (int)(Math.abs((long)path.toString().hashCode()) % _listThreads);
+
+        if (!_listQueues[index].offer(envelope)) {
             throw new MissingResourceCacheException("PnfsManager queue limit exceeded");
         }
     }
@@ -3318,7 +3336,6 @@ public class PnfsManagerV3
         if (Strings.emptyToNull(prefix) != null) {
             message.setResolvedPrefix(resolveSymlinks(prefix).toString());
         }
-
         message.setResolvedPath(resolveSymlinks(path).toString());
         message.setSucceeded();
     }
