@@ -2212,7 +2212,7 @@ public class PnfsManagerV3
                 }
 
                 if (other.fold(_msg)) {
-                    LOGGER.info("Folded partial {}, entries={}", other.getClass().getSimpleName(), other.getEntries().size());
+                    LOGGER.info("Folded partial {}, entries={}", other, other.getEntries().size());
                     other.setReply();
                     CellPath source = env.getSourcePath().revert();
                     CellMessage parcel = new CellMessage(source, other);
@@ -2394,9 +2394,8 @@ public class PnfsManagerV3
                         break;
                     }
 
-                    boolean yes = other.fold(message);
                     if (other.fold(message)) {
-                        LOGGER.info("Folded {}", other.getClass().getSimpleName());
+                        LOGGER.info("Folded {} {}", other,other.getClass().getSimpleName());
 
                         _foldedCounters.incrementRequests(message.getClass());
 
