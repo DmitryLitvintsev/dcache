@@ -97,6 +97,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -252,11 +253,11 @@ public class PnfsManagerV3
     private List<String> _flushNotificationTargets;
     private List<String> _cancelUploadNotificationTargets = Collections.emptyList();
 
-    private List<ProcessListThread> _listProcessThreads = new ArrayList<>();
+    private final List<ProcessThread> _listProcessThreads = new ArrayList<>();
 
     private JdbcQuota quotaSystem;
 
-    private Function<FsPath, FsPath> pathResolver = p -> resolveSymlinks(p.toString());
+    private final Function<FsPath, FsPath> pathResolver = p -> resolveSymlinks(p.toString());
 
     private void populateRequestMap() {
         _gauges.addGauge(PnfsAddCacheLocationMessage.class);
@@ -438,7 +439,7 @@ public class PnfsManagerV3
             } else {
                 _listQueues[i] = new LinkedBlockingQueue<>();
             }
-            ProcessListThread t = new ProcessListThread(_listQueues[i]);
+            ProcessThread t = new ProcessThread(_listQueues[i]);
             _listProcessThreads.add(t);
             executor.execute(t);
         }
@@ -483,7 +484,7 @@ public class PnfsManagerV3
                             }
                         }
                     }),
-                    10000000,
+                    updateFsStatIntervalUnit.toMillis(updateFsStatInterval),
                     updateFsStatIntervalUnit.toMillis(updateFsStatInterval),
                     TimeUnit.MILLISECONDS);
 
@@ -496,7 +497,7 @@ public class PnfsManagerV3
                                 quotaSystem.updateGroupQuotas();
                             }
                         }),
-                        6000000,
+                        updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                         updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                         TimeUnit.MILLISECONDS);
 
@@ -508,7 +509,7 @@ public class PnfsManagerV3
                                 quotaSystem.updateUserQuotas();
                             }
                         }),
-                        6000000,
+                        updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                         updateQuotaIntervalUnit.toMillis(updateQuotaInterval),
                         TimeUnit.MILLISECONDS);
         }
@@ -1527,11 +1528,7 @@ public class PnfsManagerV3
         public String call() {
             ColumnWriter writer = buildColumnWriter();
 
-            int queuedRequests = Arrays.stream(_listQueues)
-                .mapToInt(BlockingQueue::size).sum();
-
-
-            if (queuedRequests > 0) {
+	    if (Arrays.stream(_listQueues).anyMatch(q -> !q.isEmpty())) {
                 writer.section("QUEUED REQUESTS");
                 for (BlockingQueue<CellMessage> queue : _listQueues) {
                     if (!queue.isEmpty()) {
@@ -1541,7 +1538,7 @@ public class PnfsManagerV3
             }
 
             List<ActivityReport> activity = _listProcessThreads.stream()
-                  .map(ProcessListThread::getCurrentActivity)
+                  .map(ProcessThread::getCurrentActivity)
                   .filter(Optional::isPresent)
                   .map(Optional::get)
                   .collect(Collectors.toList());
@@ -2202,10 +2199,9 @@ public class PnfsManagerV3
              * fold other list requests in the queue
              */
 
-            Iterator<CellMessage> i = _fifo.iterator();
-            while (i.hasNext()) {
-                CellMessage env = i.next();
-                PnfsListDirectoryMessage other = (PnfsListDirectoryMessage) env.getMessageObject();
+            for (CellMessage message : _fifo) {
+                PnfsListDirectoryMessage other =
+                      (PnfsListDirectoryMessage) message.getMessageObject();
 
                 if (other.invalidates(_msg)) {
                     break;
@@ -2214,9 +2210,9 @@ public class PnfsManagerV3
                 if (other.fold(_msg)) {
                     LOGGER.info("Folded partial {}, entries={}", other, other.getEntries().size());
                     other.setReply();
-                    CellPath source = env.getSourcePath().revert();
+                    CellPath source = message.getSourcePath().revert();
                     CellMessage parcel = new CellMessage(source, other);
-                    parcel.setLastUOID(env.getUOID());
+                    parcel.setLastUOID(message.getUOID());
                     sendMessage(parcel);
                     other.clear();
                 }
@@ -2302,113 +2298,6 @@ public class PnfsManagerV3
         }
     }
 
-    private class ProcessListThread implements Runnable {
-
-        private final BlockingQueue<CellMessage> _fifo;
-
-        private volatile CellMessage _activeMessage;
-        private volatile Instant _whenStarted;
-
-        private ProcessListThread(BlockingQueue<CellMessage> fifo) {
-            _fifo = fifo;
-        }
-
-        public synchronized Optional<ActivityReport> getCurrentActivity() {
-            if (_activeMessage == null) {
-                return Optional.empty();
-            } else {
-                ActivityReport report = new ActivityReport(_activeMessage, _whenStarted);
-                return Optional.of(report);
-            }
-        }
-
-        private synchronized void recordActivity(CellMessage message) {
-            _activeMessage = message;
-            _whenStarted = Instant.now();
-        }
-
-        private synchronized void clearActivity() {
-            _activeMessage = null;
-            _whenStarted = null;
-        }
-
-        @Override
-        public void run() {
-            try {
-                for (CellMessage message = _fifo.take(); message != SHUTDOWN_SENTINEL;
-                      message = _fifo.take()) {
-                    CDC.setMessageContext(message);
-                    try {
-                        recordActivity(message);
-
-                        /* Discard messages if we are close to their
-                         * timeout (within 10% of the TTL or 10 seconds,
-                         * whatever is smaller)
-                         */
-                        PnfsListDirectoryMessage pnfs = (PnfsListDirectoryMessage) message.getMessageObject();
-                        // if (message.getLocalAge() > message.getAdjustedTtl() && useEarlyDiscard(
-                        //       pnfs)) {
-                        if (message.getLocalAge() > TimeUnit.SECONDS.toMillis(300) && useEarlyDiscard(
-                              pnfs)) {
-                            LOGGER.warn("Discarding {} because its time to live has been exceeded.",
-                                  pnfs.getClass().getSimpleName());
-                            sendTimeout(message, "TTL exceeded");
-                            continue;
-                        }
-
-                        long ctime = System.currentTimeMillis();
-                        listDirectory(message, pnfs, _fifo);
-
-                        long duration = System.currentTimeMillis() - ctime;
-                        _gauges.update(pnfs.getClass(), duration);
-                        if (_logSlowThreshold != THRESHOLD_DISABLED && duration > _logSlowThreshold) {
-                            LOGGER.warn("{} processed in {} ms", pnfs.getClass(), duration);
-                        } else {
-                            LOGGER.info("{} processed in {} ms", pnfs.getClass(), duration);
-                        }
-
-                        postProcessMessage(message, pnfs);
-                        fold(pnfs);
-                    } catch (Throwable e) {
-                        LOGGER.warn("processPnfsMessage: {} : {}", Thread.currentThread().getName(),
-                              e);
-                    } finally {
-                        clearActivity();
-                        CDC.clearMessageContext();
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        protected void fold(PnfsMessage message) {
-            if (_canFold && message.getReturnCode() == 0) {
-                Iterator<CellMessage> i = _fifo.iterator();
-                while (i.hasNext()) {
-                    CellMessage envelope = i.next();
-                    PnfsMessage other =
-                          (PnfsMessage) envelope.getMessageObject();
-
-                    if (other.invalidates(message)) {
-                        break;
-                    }
-
-                    if (other.fold(message)) {
-                        LOGGER.info("Folded {} {}", other,other.getClass().getSimpleName());
-
-                        _foldedCounters.incrementRequests(message.getClass());
-
-                        i.remove();
-                        envelope.revertDirection();
-
-                        sendMessage(envelope);
-                    }
-                }
-            }
-        }
-    }
-
     private class ProcessThread implements Runnable {
 
         private final BlockingQueue<CellMessage> _fifo;
@@ -2460,12 +2349,25 @@ public class PnfsManagerV3
                             sendTimeout(message, "TTL exceeded");
                             continue;
                         }
-
-                        processPnfsMessage(message, pnfs);
+                        if (!(pnfs instanceof PnfsListDirectoryMessage)) {
+                            processPnfsMessage(message, pnfs);
+                        } else {
+                            long ctime = System.currentTimeMillis();
+                            listDirectory(message, (PnfsListDirectoryMessage) pnfs, _fifo);
+                            long duration = System.currentTimeMillis() - ctime;
+                            _gauges.update(pnfs.getClass(), duration);
+                            if (_logSlowThreshold != THRESHOLD_DISABLED &&
+                                  duration > _logSlowThreshold) {
+                                LOGGER.warn("{} processed in {} ms", pnfs.getClass(), duration);
+                            } else {
+                                LOGGER.info("{} processed in {} ms", pnfs.getClass(), duration);
+                            }
+                            postProcessMessage(message, pnfs);
+                        }
                         fold(pnfs);
                     } catch (Throwable e) {
-                        LOGGER.warn("processPnfsMessage: {} : {}", Thread.currentThread().getName(),
-                              e);
+                        LOGGER.warn("processPnfsMessage: {} : {}",
+                              Thread.currentThread().getName(), e);
                     } finally {
                         clearActivity();
                         CDC.clearMessageContext();
@@ -2706,7 +2608,7 @@ public class PnfsManagerV3
             throw new InvalidMessageCacheException("Missing PNFS id and path");
         }
 
-        int index = (int)(Math.abs((long)path.toString().hashCode()) % _listThreads);
+        int index = (int)(Math.abs((long)Objects.hashCode(path.toString())) % _listThreads);
 
         if (!_listQueues[index].offer(envelope)) {
             throw new MissingResourceCacheException("PnfsManager queue limit exceeded");
@@ -2811,8 +2713,6 @@ public class PnfsManagerV3
             processFlushMessage((PoolFileFlushedMessage) pnfsMessage);
         } else if (pnfsMessage instanceof PnfsGetParentMessage) {
             getParent((PnfsGetParentMessage) pnfsMessage);
-        } else if (pnfsMessage instanceof PnfsListDirectoryMessage) {
-            listDirectory(message, (PnfsListDirectoryMessage) pnfsMessage, null);
         } else if (pnfsMessage instanceof PnfsGetFileAttributes) {
             getFileAttributes((PnfsGetFileAttributes) pnfsMessage);
         } else if (pnfsMessage instanceof PnfsSetFileAttributes) {

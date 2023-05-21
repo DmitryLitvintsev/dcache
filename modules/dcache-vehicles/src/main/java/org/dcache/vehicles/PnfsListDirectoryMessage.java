@@ -176,10 +176,6 @@ public class PnfsListDirectoryMessage extends PnfsMessage {
         _messageCount = messageCount;
     }
 
-    public void incrementMessageCount() {
-        ++_messageCount;
-    }
-
     @Override
     public boolean invalidates(Message message) {
         return false;
@@ -207,7 +203,6 @@ public class PnfsListDirectoryMessage extends PnfsMessage {
                 return true;
             }
         }
-
         return false;
     }
 
