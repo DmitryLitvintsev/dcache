@@ -1,6 +1,7 @@
 package org.dcache.vehicles;
 
 import static java.util.Objects.requireNonNull;
+import static org.dcache.auth.Subjects.getDisplayName;
 
 import com.google.common.collect.BoundType;
 import com.google.common.collect.Range;
@@ -194,14 +195,13 @@ public class PnfsListDirectoryMessage extends PnfsMessage {
                   (PnfsListDirectoryMessage) message;
 
             if (path.equals(other.getPnfsPath()) &&
-                getSubject().equals(other.getSubject()) &&
+                getDisplayName(getSubject()).equals(getDisplayName(other.getSubject())) &&
                 getMessageCount() == other.getMessageCount()-1 &&
                 other.getRequestedAttributes().containsAll(requested)) {
-                setEntries(other.getEntries());
 
-                // for (DirectoryEntry e: other.getEntries()) {
-                //       addEntry(e.getName(), e.getFileAttributes());
-                // }
+                 for (DirectoryEntry e: other.getEntries()) {
+                       addEntry(e.getName(), e.getFileAttributes());
+                 }
 
                 if (other.isFinal()) {
                     setSucceeded(other.getMessageCount());
