@@ -198,11 +198,8 @@ public class PnfsListDirectoryMessage extends PnfsMessage {
                 getDisplayName(getSubject()).equals(getDisplayName(other.getSubject())) &&
                 getMessageCount() == other.getMessageCount()-1 &&
                 other.getRequestedAttributes().containsAll(requested)) {
-
-                 for (DirectoryEntry e: other.getEntries()) {
-                       addEntry(e.getName(), e.getFileAttributes());
-                 }
-
+                other.getEntries().forEach(e -> addEntry(e.getName(),
+                                                         e.getFileAttributes()));
                 if (other.isFinal()) {
                     setSucceeded(other.getMessageCount());
                 }
