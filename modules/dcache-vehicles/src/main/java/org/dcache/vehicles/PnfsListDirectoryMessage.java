@@ -7,7 +7,6 @@ import com.google.common.collect.BoundType;
 import com.google.common.collect.Range;
 import diskCacheV111.vehicles.Message;
 import diskCacheV111.util.FsPath;
-import diskCacheV111.util.PnfsId;
 import diskCacheV111.vehicles.PnfsMessage;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -184,7 +183,6 @@ public class PnfsListDirectoryMessage extends PnfsMessage {
     @Override
     public boolean fold(Message message) {
         if (message instanceof PnfsListDirectoryMessage) {
-            PnfsId pnfsId = getPnfsId();
             String path = getPnfsPath();
             Set<FileAttribute> requested = getRequestedAttributes();
             PnfsListDirectoryMessage other =
