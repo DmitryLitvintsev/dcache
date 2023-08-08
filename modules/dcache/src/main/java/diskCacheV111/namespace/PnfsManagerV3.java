@@ -322,7 +322,7 @@ public class PnfsManagerV3
     }
 
     @Required
-    public void setUseParallelListing(boolean useParallelListing) { 
+    public void setUseParallelListing(boolean useParallelListing) {
         this.useParallelListing = useParallelListing;
     }
 
@@ -437,7 +437,7 @@ public class PnfsManagerV3
             executor.execute(new ProcessThread(_fifos[i]));
         }
 
-	if (useParallelListing) { 
+	if (useParallelListing) {
 	    /**
 	     * when using parallel listing we have _listThreads
 	     * consumers serving a single queue.
@@ -445,7 +445,7 @@ public class PnfsManagerV3
 	    _listQueues =  new BlockingQueue[1];
 	    if (_queueMaxSize > 0) {
 		_listQueues[0] = new LinkedBlockingQueue<>(_queueMaxSize);
-	    } else { 
+	    } else {
 		_listQueues[0] = new LinkedBlockingQueue<>();
 	    }
 
@@ -457,11 +457,10 @@ public class PnfsManagerV3
 		_listProcessThreads.add(t);
 		executor.execute(t);
 	    }
-	    
 	} else {
 	    /**
 	     * Start separate _listThreads queues for list operations.
-	     * each consumer processes a dedicated queue 
+	     * each consumer processes a dedicated queue
 	     */
 	    _listQueues =  new BlockingQueue[_listThreads];
 	    for (int i = 0; i < _listQueues.length; i++) {
@@ -2641,13 +2640,13 @@ public class PnfsManagerV3
         }
 
 	int index = 0;
-	
+
 	if (!useParallelListing) {
 	    index = (int)(Math.abs((long)Objects.hashCode(path.toString())) % _listThreads);
-	} 
+	}
 
 	/**
-	 * when useParallelListing is true, we only have 1 queue in the 
+	 * when useParallelListing is true, we only have 1 queue in the
 	 * list of queues below
 	 */
 
