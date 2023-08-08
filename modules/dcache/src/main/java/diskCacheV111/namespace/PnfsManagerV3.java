@@ -2227,25 +2227,28 @@ public class PnfsManagerV3
             _messageCount++;
             _msg.setMessageCount(_messageCount);
 
-            /**
-             * fold other list requests for the same target in the queue
-             */
 
-            for (CellMessage message : _fifo) {
+            if (!useParallelListing) {
+                /**
+                 * fold other list requests for the same target in the queue
+                 */
 
-		PnfsMessage other = (PnfsMessage) message.getMessageObject();
+                for (CellMessage message : _fifo) {
 
-                if (other.invalidates(_msg)) {
-                    break;
-                }
+                    PnfsMessage other = (PnfsMessage) message.getMessageObject();
 
-                if (other.fold(_msg)) {
-		    other.setReply();
-                    CellPath source = message.getSourcePath().revert();
-                    CellMessage parcel = new CellMessage(source, other);
-                    parcel.setLastUOID(message.getUOID());
-                    sendMessage(parcel);
-                    ((PnfsListDirectoryMessage)other).clear();
+                    if (other.invalidates(_msg)) {
+                        break;
+                    }
+
+                    if (other.fold(_msg)) {
+                        other.setReply();
+                        CellPath source = message.getSourcePath().revert();
+                        CellMessage parcel = new CellMessage(source, other);
+                        parcel.setLastUOID(message.getUOID());
+                        sendMessage(parcel);
+                        ((PnfsListDirectoryMessage)other).clear();
+                    }
                 }
             }
             _msg.clear();
