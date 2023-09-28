@@ -12,10 +12,21 @@ import io.milton.http.HandlerHelper;
 import io.milton.http.HttpManager;
 import io.milton.http.Response;
 import io.milton.http.Response.Status;
+import io.milton.http.exceptions.BadRequestException;
+import io.milton.http.exceptions.NotAuthorizedException;
 import io.milton.http.http11.DefaultHttp11ResponseHandler;
+import io.milton.http.webdav.DefaultPropFindRequestFieldParser;
 import io.milton.http.webdav.DefaultWebDavResponseHandler;
+import io.milton.http.webdav.MsPropFindRequestFieldParser;
+import io.milton.http.webdav.PropFindPropertyBuilder;
+import io.milton.http.webdav.PropFindResponse;
 import io.milton.http.webdav.PropFindXmlGenerator;
+import io.milton.http.webdav.PropertiesRequest;
+import io.milton.resource.PropFindableResource;
+import java.net.URISyntaxException;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 import org.dcache.http.PathMapper;
 import org.dcache.webdav.federation.FederationResponseHandler;
 import org.springframework.beans.factory.FactoryBean;
@@ -23,10 +34,22 @@ import org.springframework.beans.factory.annotation.Required;
 
 public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBean {
 
+    private static ThreadLocal<PropertiesRequest> PROPERTY_REQUEST = new ThreadLocal<>();
+
+    enum DefaultProperties {
+        PERFORMANCE,
+        MICROSOFT_COMPATIBLE
+    };
+
     private ReloadableTemplate _template;
     private ImmutableMap<String, String> _templateConfig;
     private String _staticContentPath;
     private PathMapper _pathMapper;
+    private DefaultProperties _defaultProperties = DefaultProperties.MICROSOFT_COMPATIBLE;
+
+    public static Optional<PropertiesRequest> propertiesRequest() {
+        return Optional.ofNullable(PROPERTY_REQUEST.get());
+    }
 
     @Override
     public Object getObject() throws Exception {
@@ -45,6 +68,12 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
         Rfc3230ResponseHandler rfc3230 = Rfc3230ResponseHandler.wrap(workarounds);
         AbstractWrappingResponseHandler handler = new FederationResponseHandler(rfc3230);
         setWebdavResponseHandler(handler);
+
+        var defaultFieldParser = new DefaultPropFindRequestFieldParser();
+        var fieldParser = _defaultProperties == DefaultProperties.PERFORMANCE
+            ? new DcachePropFindRequestFieldParser(defaultFieldParser)
+            : new MsPropFindRequestFieldParser(defaultFieldParser);
+        setPropFindRequestFieldParser(fieldParser);
 
         init();
 
@@ -68,6 +97,29 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
 
         return buildHttpManager();
     }
+
+    @Override
+    protected PropFindPropertyBuilder propFindPropertyBuilder() {
+        if (super.getPropFindPropertyBuilder() == null) {
+            var inner = super.propFindPropertyBuilder();
+            var newBuilder = new ForwardingPropFindPropertyBuilder(inner) {
+                @Override
+                public List<PropFindResponse> buildProperties(PropFindableResource pfr, int depth,
+                            PropertiesRequest parseResult, String url) throws URISyntaxException,
+                            NotAuthorizedException, BadRequestException {
+                    PROPERTY_REQUEST.set(parseResult);
+                    try {
+                        return super.buildProperties(pfr, depth, parseResult, url);
+                    } finally {
+                        PROPERTY_REQUEST.remove();
+                    }
+                }
+            };
+            super.setPropFindPropertyBuilder(newBuilder);
+        }
+        return super.getPropFindPropertyBuilder();
+    }
+
 
     /* The following hack allows injection of custom objects part way through init */
     @Override
@@ -154,6 +206,11 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
     @Required
     public void setTemplateConfig(ImmutableMap<String, String> config) {
         _templateConfig = config;
+    }
+
+    @Required
+    public void setDefaultProperties(DefaultProperties properties) {
+        _defaultProperties = requireNonNull(properties);
     }
 
     /**
