@@ -62,42 +62,21 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
 
-    <changeSet author="rossi" id="7.1">
+    <changeSet author="litvinse" id="7.2" runInTransaction="false">
         <preConditions onFail="MARK_RAN">
-            <not>
-                <tableExists tableName="qos_file_status"/>
-            </not>
+            <and>
+                <columnExists tableName="request_target" columnName="path"/>
+            </and>
         </preConditions>
-
-        <comment>represents files awaiting transition to next state</comment>
-        <createTable tableName="qos_file_status">
-            <column name="id" type="int" autoIncrement="true">
-                <constraints nullable="false" unique="true"/>
-            </column>
-            <column name="pnfsid" type="varchar(64)">
-                <constraints nullable="false" primaryKeyName="qos_file_status_pkey" primaryKey="true"/>
-            </column>
-            <column name="expires" type="bigint">
-                <constraints nullable="false"/>
-            </column>
-            <column name="state" type="int">
-                <constraints nullable="false"/>
-            </column>
-        </createTable>
-
-        <createIndex tableName="qos_file_status"
-          indexName="idx_expires_qos" unique="false">
-            <column name="expires"/>
-        </createIndex>
-        <rollback/>
+        <modifyDataType tableName="request_target" columnName="pid" newDataType="varchar(2048)"/>
+	<rollback>
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <columnExists tableName="request_target" columnName="path"/>
+            </and>
+        </preConditions>
+        <modifyDataType tableName="request_target" columnName="pid" newDataType="varchar(256)"/>
+        </rollback>
     </changeSet>
 
-    <changeSet author="rossi" id="7.2">
-        <preConditions onFail="MARK_RAN">
-            <tableExists tableName="qos_operation"/>
-        </preConditions>
-
-        <dropColumn tableName="qos_operation" columnName="subject"/>
-        <rollback/>
-    </changeSet>
 </databaseChangeLog>
