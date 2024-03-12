@@ -70,11 +70,6 @@
         </preConditions>
         <modifyDataType tableName="request_target" columnName="path" newDataType="varchar(2048)"/>
 	<rollback>
-        <preConditions onFail="MARK_RAN">
-            <and>
-                <columnExists tableName="request_target" columnName="path"/>
-            </and>
-        </preConditions>
         <modifyDataType tableName="request_target" columnName="path" newDataType="varchar(256)"/>
         </rollback>
     </changeSet>
