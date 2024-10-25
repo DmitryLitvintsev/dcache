@@ -1,3 +1,4 @@
+
 package org.dcache.xrootd.door;
 
 import static org.dcache.xrootd.plugins.tls.SSLHandlerFactory.SERVER_TLS;
@@ -22,7 +23,9 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.haproxy.HAProxyMessage;
 import io.netty.handler.codec.haproxy.HAProxyMessageDecoder;
+import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
 import io.netty.handler.logging.LoggingHandler;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -286,7 +289,8 @@ public class NettyXrootdServer implements CellIdentityAware {
                       }
 
                       XrootdRedirectHandler handler = new XrootdRedirectHandler(_door, _rootPath,
-                            _requestExecutor, _queryConfig, _appIoQueues);
+										_requestExecutor, _queryConfig,
+										_appIoQueues, _expectProxyProtocol);
                       handler.setSigningPolicy(_signingPolicy);
                       handler.setTlsSessionInfo(tlsSessionInfo);
                       pipeline.addLast("redirector", handler);
