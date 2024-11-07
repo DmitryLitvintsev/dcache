@@ -77,10 +77,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.dcache.pinmanager.PinManagerPinMessage;
+import org.dcache.vehicles.PnfsResolveSymlinksMessage;
 import org.dcache.services.bulk.BulkServiceException;
 import org.dcache.services.bulk.activity.BulkActivityArgumentDescriptor;
 import org.dcache.services.bulk.util.BulkRequestTarget;
@@ -146,7 +148,29 @@ public final class StageActivity extends PinManagerActivity {
         if (arguments != null) {
             String value = arguments.get("diskLifetime");
             if (value != null) {
-                jsonLifetimes = new JSONObject(value);
+		JSONObject jsonArgs = new JSONObject(value);
+		jsonLifetimes = new JSONObject();
+		/*
+		 * arguments contain client specified paths that 
+		 * can be symlinks, we need to resolve them
+		 * so that already resolved target paths can match
+		 * the arguments 
+		 */
+		Iterator<String> paths = jsonArgs.keys();
+		while (paths.hasNext()) {
+		    String path = paths.next();
+		    String lifetime = jsonArgs.optString(path);
+		    try { 
+			PnfsResolveSymlinksMessage message =
+			    pnfsHandler.request(new PnfsResolveSymlinksMessage(path, null));
+			path = message.getResolvedPath();
+		    } catch (CacheException e) {
+			/*
+			 * if we can't resolve - ignore
+			 */
+		    }
+		    jsonLifetimes.put(path, lifetime);
+		}
             }
             value = arguments.get("targetedMetadata");
             if (value != null) {
