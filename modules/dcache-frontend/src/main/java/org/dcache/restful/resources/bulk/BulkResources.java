@@ -59,6 +59,7 @@ documents or software obtained from this server.
  */
 package org.dcache.restful.resources.bulk;
 
+import static org.dcache.http.AuthenticationHandler.getLoginAttributes;
 import static org.dcache.restful.util.HttpServletRequests.getUserRootAwareTargetPrefix;
 import static org.dcache.restful.util.JSONUtils.newBadRequestException;
 
@@ -67,6 +68,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
+import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsHandler;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -92,6 +94,7 @@ import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.PATCH;
@@ -103,9 +106,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.dcache.auth.attributes.LoginAttributes;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.CellStub;
+import org.dcache.http.PathMapper;
 import org.dcache.restful.util.HandlerBuilders;
 import org.dcache.restful.util.RequestUser;
 import org.dcache.restful.util.bulk.BulkServiceCommunicator;
@@ -124,9 +129,13 @@ import org.dcache.services.bulk.BulkRequestMessage;
 import org.dcache.services.bulk.BulkRequestStatus;
 import org.dcache.services.bulk.BulkRequestStatusMessage;
 import org.dcache.services.bulk.BulkRequestSummary;
+import org.dcache.services.bulk.BulkRequestTargetInfo;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
 
 /**
  * <p>RESTful API to the BulkService.</p>
@@ -138,11 +147,17 @@ import org.springframework.stereotype.Component;
 @Path("/bulk-requests")
 public final class BulkResources {
 
+    private static final Logger LOGGER =
+        LoggerFactory.getLogger(BulkResources.class);
+
     @Context
     private HttpServletRequest request;
 
     @Inject
     private BulkServiceCommunicator service;
+
+    @Inject
+    private PathMapper pathMapper;
 
     @Inject
     @Named("pnfs-stub")
@@ -235,8 +250,9 @@ public final class BulkResources {
         Subject subject = getSubject();
         Restriction restriction = getRestriction();
         PnfsHandler handler = HandlerBuilders.unrestrictedPnfsHandler(pnfsmanager);
-        BulkRequest request = toBulkRequest(requestPayload, this.request, handler);
-
+	FsPath userRoot = LoginAttributes.getUserRoot(getLoginAttributes(request));
+	FsPath rootPath = pathMapper.effectiveRoot(userRoot, ForbiddenException::new);
+	BulkRequest request = toBulkRequest(requestPayload, this.request, handler, rootPath);
         /*
          *  Frontend sets the URL.  The backend service provides the UUID.
          */
@@ -284,7 +300,12 @@ public final class BulkResources {
         message.setSubject(subject);
         message.setOffset(offset);
         message = service.send(message);
-        return message.getInfo();
+        BulkRequestInfo info = message.getInfo();
+        List<BulkRequestTargetInfo> targetInfos = info.getTargets();
+        targetInfos.forEach(ti -> ti.setTarget(FsPath.create(ti.getTarget())
+                                               .stripPrefix(FsPath.create(info.getTargetPrefix()))));
+        info.setTargets(targetInfos);
+        return info;
     }
 
     @GET
@@ -498,7 +519,11 @@ public final class BulkResources {
      * they are defined in the Bulk service as well.
      */
     @VisibleForTesting
-    static BulkRequest toBulkRequest(String requestPayload, HttpServletRequest httpServletRequest, PnfsHandler handler) {
+    static BulkRequest toBulkRequest(String requestPayload,
+                                     HttpServletRequest httpServletRequest,
+                                     PnfsHandler handler,
+                                     FsPath rootPath) {
+
         if (Strings.emptyToNull(requestPayload) == null) {
             throw new BadRequestException("empty request payload.");
         }
@@ -511,6 +536,7 @@ public final class BulkResources {
         }
 
         BulkRequest request = new BulkRequest();
+        request.setTargetPrefix(getUserRootAwareTargetPrefix(httpServletRequest, rootPath.toString(), handler));
 
         Map<String, Object> arguments = (Map<String, Object>) map.remove("arguments");
         if (arguments != null) {
@@ -524,13 +550,23 @@ public final class BulkResources {
         if (targets.isEmpty()) {
             throw new BadRequestException("request contains no targets.");
         }
-        request.setTarget(targets);
+
+        List<String> paths = targets.stream()
+            .map(t -> rootPath.chroot(t).toString())
+            .collect(Collectors.toList());
+
+        LOGGER.error("targets {}", paths);
+
+        request.setTarget(paths);
 
         String string = removeEntry(map, String.class, "activity");
         request.setActivity(string);
 
         string = removeEntry(map, String.class, "target_prefix", "target-prefix",
               "targetPrefix");
+
+        LOGGER.error("target_prefix {}", string);
+
         if (httpServletRequest != null) {
             request.setTargetPrefix(getUserRootAwareTargetPrefix(httpServletRequest, string, handler));
         } else {
