@@ -61,7 +61,6 @@ package org.dcache.restful.resources.bulk;
 
 import static org.dcache.restful.resources.bulk.BulkResources.toBulkRequest;
 import static org.junit.Assert.assertEquals;
-import static diskCacheV111.util.FsPath.create;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsHandler;
@@ -183,6 +182,6 @@ public class BulkRequestJsonParseTest {
     }
 
     private void whenParsed() {
-        bulkRequest = toBulkRequest(requestJson, null, handler, create("/"));
+        bulkRequest = toBulkRequest(requestJson, null, handler);
     }
 }
