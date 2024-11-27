@@ -167,8 +167,10 @@ public final class ArchiveInfoResources {
         }
 
         var archiveInfos = archiveInfoCollector.getInfo(HandlerBuilders.roleAwarePnfsHandler(pnfsManager),
-              paths);
-
+                                                        rootPath.toString(),
+                                                        paths);
         return archiveInfos;
     }
+
+
 }
