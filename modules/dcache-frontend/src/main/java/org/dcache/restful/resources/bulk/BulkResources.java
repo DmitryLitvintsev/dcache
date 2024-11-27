@@ -67,6 +67,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
+import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsHandler;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -126,6 +127,8 @@ import org.dcache.services.bulk.BulkRequestStatusMessage;
 import org.dcache.services.bulk.BulkRequestSummary;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -137,6 +140,9 @@ import org.springframework.stereotype.Component;
 @Api(value = "bulk-requests", authorizations = {@Authorization("basicAuth")})
 @Path("/bulk-requests")
 public final class BulkResources {
+
+    private static final Logger LOGGER =
+        LoggerFactory.getLogger(BulkResources.class);
 
     @Context
     private HttpServletRequest request;
@@ -235,11 +241,15 @@ public final class BulkResources {
         Subject subject = getSubject();
         Restriction restriction = getRestriction();
         PnfsHandler handler = HandlerBuilders.unrestrictedPnfsHandler(pnfsmanager);
-        BulkRequest request = toBulkRequest(requestPayload, this.request, handler);
+        FsPath userRoot = LoginAttributes.getUserRoot(getLoginAttributes(request));
+        FsPath rootPath = pathMapper.effectiveRoot(userRoot, ForbiddenException::new);
+        BulkRequest request = toBulkRequest(requestPayload, this.request, handler, rootPath);
 
         /*
          *  Frontend sets the URL.  The backend service provides the UUID.
          */
+        LOGGER.error("setUrlPrefix {}",
+                     this.request.getRequestURL().toString());
         request.setUrlPrefix(this.request.getRequestURL().toString());
 
         BulkRequestMessage message = new BulkRequestMessage(request, restriction);
@@ -498,7 +508,7 @@ public final class BulkResources {
      * they are defined in the Bulk service as well.
      */
     @VisibleForTesting
-    static BulkRequest toBulkRequest(String requestPayload, HttpServletRequest httpServletRequest, PnfsHandler handler) {
+    static BulkRequest toBulkRequest(String requestPayload, HttpServletRequest httpServletRequest, PnfsHandler handler, FsPath rootPath) {
         if (Strings.emptyToNull(requestPayload) == null) {
             throw new BadRequestException("empty request payload.");
         }
@@ -531,8 +541,10 @@ public final class BulkResources {
 
         string = removeEntry(map, String.class, "target_prefix", "target-prefix",
               "targetPrefix");
+        LOGGER.error("prefix {} userrootaware {}", string, getUserRootAwareTargetPrefix(httpServletRequest, string, handler));
+
         if (httpServletRequest != null) {
-            request.setTargetPrefix(getUserRootAwareTargetPrefix(httpServletRequest, string, handler));
+            request.setTargetPrefix(etUserRootAwareTargetPrefix(httpServletRequest, rootPath.toString(), handler));
         } else {
             request.setTargetPrefix(string);
         }

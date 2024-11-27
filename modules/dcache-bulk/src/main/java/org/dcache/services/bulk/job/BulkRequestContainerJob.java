@@ -511,8 +511,12 @@ public final class BulkRequestContainerJob
          * (1) retrieval of required file attributes.
          */
         private void fetchAttributes() {
-            LOGGER.debug("{} - fetchAttributes for path {}", ruid, target.getPath());
-            PnfsGetFileAttributes message = new PnfsGetFileAttributes(target.getPath().toString(),
+            FsPath absolutePath = findAbsolutePath(targetPrefix,
+                                                   target.getPath().toString());
+            LOGGER.error("{} - fetchAttributes for path {}, prefix {}, absolute path {} ", ruid, target.getPath(), targetPrefix, absolutePath);
+
+
+            PnfsGetFileAttributes message = new PnfsGetFileAttributes(absolutePath.toString(),
                   MINIMALLY_REQUIRED_ATTRIBUTES);
             ListenableFuture<PnfsGetFileAttributes> requestFuture = pnfsHandler.requestAsync(
                   message);

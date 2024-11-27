@@ -60,6 +60,7 @@ documents or software obtained from this server.
 package org.dcache.restful.util;
 
 import static org.dcache.restful.util.HttpServletRequests.getTargetPrefixFromUserRoot;
+import static diskCacheV111.util.FsPath.create;
 import static org.junit.Assert.assertEquals;
 
 import diskCacheV111.util.FsPath;
@@ -181,6 +182,6 @@ public class BulkRequestTargetPathTest {
     }
 
     private void assertThatFullPrefixIs(String fullPrefix) {
-        assertEquals(fullPrefix, getTargetPrefixFromUserRoot(userRootPath, targetPrefix));
+        assertEquals(fullPrefix, getTargetPrefixFromUserRoot(userRootPath, targetPrefix, create("/"));
     }
 }
