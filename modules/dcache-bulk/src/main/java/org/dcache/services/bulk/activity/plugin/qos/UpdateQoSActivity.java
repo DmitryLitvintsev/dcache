@@ -128,14 +128,15 @@ public class UpdateQoSActivity extends BulkActivity<QoSTransitionCompletedMessag
 
     @Override
     public ListenableFuture<QoSTransitionCompletedMessage> perform(String rid, long tid,
-          FsPath path, FileAttributes attributes) throws BulkServiceException {
+          String prefix, FsPath path, FileAttributes attributes) throws BulkServiceException {
         if (targetQos == null && qosPolicy == null) {
             return Futures.immediateFailedFuture(new IllegalArgumentException("no target qos or policy given."));
         }
 
         if (attributes == null) {
             try {
-                attributes = pnfsHandler.getFileAttributes(path, MINIMALLY_REQUIRED_ATTRIBUTES);
+                FsPath absolutePath = BulkRequestTarget.computeFsPath(prefix, path.toString());
+                attributes = pnfsHandler.getFileAttributes(absolutePath.toString(), MINIMALLY_REQUIRED_ATTRIBUTES);
             } catch (CacheException e) {
                 throw new BulkServiceException("failed to retrieve file attributes", e);
             }
@@ -232,6 +233,3 @@ public class UpdateQoSActivity extends BulkActivity<QoSTransitionCompletedMessag
         this.pnfsHandler = pnfsHandler;
     }
 }
-
-
-

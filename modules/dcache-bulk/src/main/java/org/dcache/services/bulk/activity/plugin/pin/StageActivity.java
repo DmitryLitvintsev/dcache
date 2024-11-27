@@ -104,16 +104,11 @@ public final class StageActivity extends PinManagerActivity {
 
     public void cancel(BulkRequestTarget target) {
         super.cancel(target);
-        try {
-            pinManager.send(unpinMessage(id, target));
-        } catch (CacheException e) {
-            target.setErrorObject(new BulkServiceException("unable to fetch pnfsid of target in "
-                  + "order to cancel staging.", e));
-        }
+        pinManager.send(unpinMessage(id, target.getAttributes().getPnfsId()));
     }
 
     @Override
-    public ListenableFuture<Message> perform(String rid, long tid, FsPath target,
+    public ListenableFuture<Message> perform(String rid, long tid, String prefix, FsPath path,
           FileAttributes attributes) {
         id = rid;
 
@@ -121,7 +116,9 @@ public final class StageActivity extends PinManagerActivity {
             /*
              *  refetch the attributes because RP is not stored in the bulk database.
              */
-            attributes = getAttributes(target);
+
+            FsPath absolutePath = BulkRequestTarget.computeFsPath(prefix, path.toString());
+            attributes = getAttributes(absolutePath);
 
             checkStageable(attributes);
 
@@ -129,7 +126,7 @@ public final class StageActivity extends PinManagerActivity {
                   = new PinManagerPinMessage(attributes, getProtocolInfo(),
                   pnfsHandler.getRestriction(),
                   id,
-                  getLifetimeInMillis(target));
+                  getLifetimeInMillis(path));
             message.setSubject(subject);
 
             Optional<ListenableFuture<Message>> skipOption = skipIfOnline(attributes, message);

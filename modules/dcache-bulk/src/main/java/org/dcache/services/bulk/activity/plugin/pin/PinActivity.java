@@ -93,16 +93,11 @@ public final class PinActivity extends PinManagerActivity {
 
     public void cancel(BulkRequestTarget target) {
         super.cancel(target);
-        try {
-            pinManager.send(unpinMessage(id, target));
-        } catch (CacheException e) {
-            target.setErrorObject(new BulkServiceException("unable to fetch pnfsid of target in "
-                  + "order to cancel pinning.", e));
-        }
+        pinManager.send(unpinMessage(id, target.getAttributes().getPnfsId()));
     }
 
     @Override
-    public ListenableFuture<Message> perform(String rid, long tid, FsPath target,
+    public ListenableFuture<Message> perform(String rid, long tid, String prefix, FsPath path,
           FileAttributes attributes) {
         if (id == null) {
             id = rid;
@@ -110,7 +105,8 @@ public final class PinActivity extends PinManagerActivity {
 
         try {
             if (attributes == null) {
-                attributes = getAttributes(target);
+                FsPath absolutePath = BulkRequestTarget.computeFsPath(prefix, path.toString());
+                attributes = getAttributes(absolutePath);
             }
 
             checkPinnable(attributes);
