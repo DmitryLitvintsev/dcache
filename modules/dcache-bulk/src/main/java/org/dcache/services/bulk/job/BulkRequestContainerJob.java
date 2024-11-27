@@ -502,7 +502,7 @@ public final class BulkRequestContainerJob
         private void fetchAttributes() {
             FsPath absolutePath = findAbsolutePath(targetPrefix,
                                                    target.getPath().toString());
-            LOGGER.error("{} - fetchAttributes for path {}, prefix {}, absolute path {} ", ruid, target.getPath(), targetPrefix, absolutePath);
+            LOGGER.debug("{} - fetchAttributes for path {}, prefix {}, absolute path {} ", ruid, target.getPath(), targetPrefix, absolutePath);
 
 
             PnfsGetFileAttributes message = new PnfsGetFileAttributes(absolutePath.toString(),
