@@ -514,8 +514,19 @@ public class MoverRequestScheduler {
                                     .setTransferStatus(CacheException.DEFAULT_ERROR_CODE,
                                           "Transfer was killed");
                           } else if (exc instanceof DiskErrorCacheException) {
+                              FaultAction faultAction = null;
+                              //TODO this is done because the FileStoreState is in another module
+                              // to be improved
+                              switch (((DiskErrorCacheException) exc).checkStatus(exc.getMessage())){
+                                  case READ_ONLY:
+                                      faultAction = FaultAction.READONLY;
+                                  break;
+                                  default:
+                                      faultAction = FaultAction.DISABLED;
+                                  break;
+                              }
                               FaultEvent faultEvent = new FaultEvent("transfer",
-                                    FaultAction.DISABLED, exc.getMessage(), exc);
+                                      faultAction, exc.getMessage(), exc);
                               _faultListeners.forEach(l -> l.faultOccurred(faultEvent));
                           } else if (exc instanceof OutOfDiskException) {
                               FaultEvent faultEvent = new FaultEvent(
@@ -540,9 +551,18 @@ public class MoverRequestScheduler {
                                         @Override
                                         public void failed(Throwable exc, Void attachment) {
                                             if (exc instanceof DiskErrorCacheException) {
+                                                FaultAction faultAction = null;
+                                                switch (((DiskErrorCacheException) exc).checkStatus(exc.getMessage())){
+                                                    case READ_ONLY:
+                                                        faultAction = FaultAction.READONLY;
+                                                        break;
+                                                    default:
+                                                        faultAction = FaultAction.DISABLED;
+                                                        break;
+                                                }
                                                 FaultEvent faultEvent = new FaultEvent(
                                                       "post-processing",
-                                                      FaultAction.DISABLED,
+                                                        faultAction,
                                                       exc.getMessage(), exc);
                                                 _faultListeners.forEach(
                                                       l -> l.faultOccurred(faultEvent));
