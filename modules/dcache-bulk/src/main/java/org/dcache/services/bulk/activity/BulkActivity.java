@@ -114,7 +114,7 @@ public abstract class BulkActivity<R> {
         retryPolicy = DEFAULT_RETRY_POLICY;
     }
 
-    public void cancel(BulkRequestTarget target) {
+    public void cancel(String prefix, BulkRequestTarget target) {
         target.cancel();
     }
 

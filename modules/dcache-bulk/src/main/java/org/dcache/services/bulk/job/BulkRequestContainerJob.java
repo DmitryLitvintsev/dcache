@@ -440,7 +440,7 @@ public final class BulkRequestContainerJob
             }
 
             if (target != null) {
-                activity.cancel(target);
+                activity.cancel(targetPrefix, target);
                 LOGGER.debug("{} - target cancelled for task {}.", ruid, seqNo);
             }
 

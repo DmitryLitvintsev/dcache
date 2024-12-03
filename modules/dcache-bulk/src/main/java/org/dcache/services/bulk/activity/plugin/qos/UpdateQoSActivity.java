@@ -112,10 +112,24 @@ public class UpdateQoSActivity extends BulkActivity<QoSTransitionCompletedMessag
     }
 
     @Override
-    public synchronized void cancel(BulkRequestTarget target) {
+    public synchronized void cancel(String prefix, BulkRequestTarget target) {
         RemoteQoSRequirementsClient client = new RemoteQoSRequirementsClient();
         client.setRequirementsService(qosEngine);
-        PnfsId pnfsId = target.getAttributes().getPnfsId();
+        PnfsId pnfsId = null;
+        if (target.getAttributes() == null) {
+            FsPath absolutePath = BulkRequestTarget.computeFsPath(prefix,
+                                                                  target.getPath().toString());
+            try {
+                pnfsId = pnfsHandler.getFileAttributes(absolutePath.toString(),
+                                                       MINIMALLY_REQUIRED_ATTRIBUTES).getPnfsId();
+            } catch (CacheException e) {
+              LOGGER.error("fileQoSRequirementsModifiedCancelled failed: failed to fetch attributes for {} {}.",
+                           target.getPath().toString(),
+                           e.getMessage());
+            }
+        } else {
+            pnfsId = target.getAttributes().getPnfsId();
+        }
         try {
             client.fileQoSRequirementsModifiedCancelled(pnfsId, subject);
         } catch (QoSException e) {
@@ -123,7 +137,7 @@ public class UpdateQoSActivity extends BulkActivity<QoSTransitionCompletedMessag
                   e.getMessage());
         }
         responseReceiver.cancel(pnfsId.toString());
-        super.cancel(target);
+        super.cancel(prefix, target);
     }
 
     @Override

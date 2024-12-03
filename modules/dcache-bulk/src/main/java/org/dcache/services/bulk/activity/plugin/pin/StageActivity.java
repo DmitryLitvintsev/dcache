@@ -102,9 +102,14 @@ public final class StageActivity extends PinManagerActivity {
         super(name, targetType);
     }
 
-    public void cancel(BulkRequestTarget target) {
-        super.cancel(target);
-        pinManager.send(unpinMessage(id, target.getAttributes().getPnfsId()));
+    public void cancel(String prefix, BulkRequestTarget target) {
+        super.cancel(prefix, target);
+        try {
+            pinManager.send(unpinMessage(id, prefix, target));
+        } catch (CacheException e) {
+            target.setErrorObject(new BulkServiceException("unable to fetch pnfsid of target in "
+                                                           + "order to cancel staging.", e));
+        }
     }
 
     @Override
