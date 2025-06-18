@@ -60,6 +60,7 @@ documents or software obtained from this server.
 package org.dcache.restful.util.wlcg;
 
 import static com.google.common.util.concurrent.Uninterruptibles.getUninterruptibly;
+import static org.dcache.namespace.FileType.REGULAR;
 
 import com.google.common.base.Throwables;
 import diskCacheV111.util.CacheException;
@@ -165,6 +166,16 @@ public class ArchiveInfoCollector implements CellCommandListener {
     private FileLocality getInfo(String path, PnfsHandler pnfsHandler) throws CacheException {
         FileAttributes attributes = pnfsHandler.getFileAttributes(path, REQUIRED_ATTRIBUTES,
               ACCESS_MASK, false);
-        return poolMonitor.getFileLocality(attributes, "localhost");
+        FileLocality locality = poolMonitor.getFileLocality(attributes, "localhost");
+        /**
+         * This is done to placate CERN FTS that refuses
+         * to remove incomplete files if their locality is not ONLINE
+         */
+        if (attributes.getFileType() == REGULAR && locality == FileLocality.NONE) {
+            if (!attributes.isDefined(FileAttribute.SIZE) || attributes.getSize() == 0) {
+                locality = FileLocality.ONLINE;
+            }
+        }
+        return locality;
     }
 }
