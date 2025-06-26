@@ -1964,7 +1964,7 @@ public class DcacheResourceFactory
                         case 507: // Insufficient Storage
                             throw new InsufficientStorageException(connection.getResponseMessage(),
                                                                    null,
-                                                                   SER_QUOTA_EXCEEDED);
+                                                                   SER_DISK_FULL);
                         case ResponseStatus.SC_INTERNAL_SERVER_ERROR:
                             throw new CacheException(
                                   "Pool error: " + connection.getResponseMessage());
