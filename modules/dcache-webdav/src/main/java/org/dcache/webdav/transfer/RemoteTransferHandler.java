@@ -893,7 +893,7 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
                             // Parent directory missing or parent is a file.
                             throw new ErrorResponseException(Response.Status.SC_BAD_REQUEST, e.getMessage());
                         } catch (QuotaExceededCacheException e) {
-                            throw new ErrorResponseException(Response.Status.SC_FORBIDDEN, e.getMessage());
+                            throw new ErrorResponseException(Response.Status.SC_INSUFFICIENT_STORAGE, e.getMessage());
                         } catch (FileExistsCacheException e) {
                             /* REVISIT: This should be moved to PnfsManager with a
                              * flag in the PnfsCreateEntryMessage.
