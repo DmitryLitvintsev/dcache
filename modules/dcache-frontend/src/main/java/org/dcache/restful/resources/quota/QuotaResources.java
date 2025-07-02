@@ -460,13 +460,9 @@ public final class QuotaResources {
             request.setReplicaLimit(jsonObject.getString("replicaLimit"));
         }
 
-        /*
-         *  REVISIT.  Output is currently not used.  This will be revisted with
-         *            further redesign of the QoS definitions.
-         */
-//        if (jsonObject.has("outputLimit")) {
-//            request.setOutputLimit(jsonObject.getString("outputLimit"));
-//        }
+        if (jsonObject.has("outputLimit")) {
+            request.setOutputLimit(jsonObject.getString("outputLimit"));
+        }
 
         return request;
     }
