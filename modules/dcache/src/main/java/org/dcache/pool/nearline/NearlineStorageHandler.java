@@ -1209,6 +1209,8 @@ public class NearlineStorageHandler
                 }
             }
 
+            flushRequests.removeAndCallback(pnfsId, cause);
+
             infoMsg.setTransferTime(System.currentTimeMillis() - activatedAt);
             infoMsg.setFileSize(getFileAttributes().getSize());
             infoMsg.setTimeQueued(activatedAt - createdAt);
@@ -1220,7 +1222,6 @@ public class NearlineStorageHandler
             } catch (KafkaException | org.apache.kafka.common.KafkaException e) {
                 LOGGER.warn("Failed to send message to kafka: {} ", Throwables.getRootCause(e).getMessage());
             }
-            flushRequests.removeAndCallback(pnfsId, cause);
         }
 
         private void removeFile(PnfsId pnfsId) {
@@ -1440,6 +1441,8 @@ public class NearlineStorageHandler
                     cause.addSuppressed(e);
                 }
             }
+            stageRequests.removeAndCallback(pnfsId, cause);
+
             if (cause instanceof CacheException) {
                 infoMsg.setResult(((CacheException) cause).getRc(), cause.getMessage());
             } else if (cause != null) {
@@ -1454,7 +1457,6 @@ public class NearlineStorageHandler
             } catch (KafkaException | org.apache.kafka.common.KafkaException e) {
                 LOGGER.warn("Failed to send message to kafka: {} ", Throwables.getRootCause(e).getMessage());
             }
-            stageRequests.removeAndCallback(pnfsId, cause);
         }
 
         public NearlineData toNearlineData() {
