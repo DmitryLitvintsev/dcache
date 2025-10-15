@@ -1,3 +1,7 @@
+#bird_small
+{
+  float: left;
+}
 
 #bird_large
 {
@@ -7,7 +11,7 @@
 h1, h2
 {
   text-align: center;
-  color: #3C3633;
+  color: blue;
 }
 
 table
@@ -19,13 +23,13 @@ table
 
 tr.total th, tr.total td
 {
-  background: #747264;
-  color: #EEEDEB;
+  background: #0000FF;
+  color: white;
 }
 
 a
 {
-  color: #EEEDEB;
+  color: white;
 }
 
 .action

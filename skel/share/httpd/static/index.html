@@ -4,51 +4,71 @@
 <head>
 <title>dCache service</title>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-<link type='text/css' rel='stylesheet' href='/styles/common.css'>
+<style type="text/css">
+h1
+{
+  font-style: italic;
+  margin-top: 0;
+}
+
+#quick h3
+{
+  font-style: italic;
+}
+
+h3
+{
+  color: white;
+}
+
+h3 a
+{
+  color: white;
+}
+</style>
 
 </head>
-<body id="index-page">
+<body background="/images/bg.svg" text="#000000" link="#000000" vlink="#000000" alink="#000000">
 <br/>
 <br/>
 <center>
-<h1 style="font-size:300%"><font color="#403c38">dCache service</font></h1>
+<h1 style="font-size:300%"><font color="#003399">dCache service</font></h1>
 </center>
-
 <center>
 <br/>
 <br/>
-<table  id="index-page-table" border="0">
+<table  border="1" bgcolor="#003399" width="90%" cellspacing="1" cellpadding="4">
   <tr id="quick">
-  <td colspan="2">
+  <td colspan="2" bgcolor="#6699cc">
      <h1>Quick Finder</h1>
-     <table id="index-container" border="0" width="100%">
+     <table border="0" width="100%" cellpadding="0">
      <tr>
-        <td width="25%" >
+        <td width="25%" align="center">
            <h3><a href="/cellInfo">Cell&nbsp;Services</a></h3>
         </td>
-        <td width="25%" >
+        <td width="25%" align="center">
            <h3><a href="/usageInfo">Pool&nbsp;Usage</a></h3>
         </td>
-        <td width="25%">
+        <td width="25%" align="center">
            <h3><a href="/poolInfo/restoreHandler/*">Tape&nbsp;Transfer&nbsp;Queue</a></h3>
         </td>
-        <td width="25%">
+        <td width="25%" align="center">
            <h3><a href="/poolInfo/restoreHandler/lazy">Detailed&nbsp;Tape&nbsp;Transfer&nbsp;Queue</a></h3>
         </td>
      </tr>
      <tr>
-        <td width="25%">
+        <td width="25%" align="center">
            <h3><a href="/queueInfo">Pool&nbsp;Transfer&nbsp;Queues</a></h3>
         </td>
-        <td width="25%">
+        <td width="25%" align="center">
            <h3><a href="/billing/">Action&nbsp;Log</a></h3>
         </td>
-        <td width="25%">
+        <td width="25%" align="center">
            <!--
            <h3><a href="/statistics/">Statistics</a></h3>
            -->
         </td>
-        <td width="25%">
+        <td width="25%" align="center">
            <!--
            <h3><a href="/history">History</a></h3>
            -->
@@ -59,10 +79,10 @@
   </td>
   </tr>
   <tr>
-    <td valign="top">
+    <td align="left" bgcolor="#6699cc" valign="top">
         <h1>Status</h1>
         <blockquote>
-            <table id="index-container">
+            <table cellpadding="10">
                 <tr>
                     <td>
                         <h3><a href="/cellInfo">Cell&nbsp;Services</a></h3>
@@ -92,10 +112,10 @@
         </blockquote>
     </td>
 
-    <td valign="top">
+    <td align="left" bgcolor="#6699cc" valign="top">
         <h1>Various Queues</h1>
         <blockquote>
-            <table id="index-container" border="0" width="100%">
+            <table border="0" cellpadding="10" width="100%">
                 <tr>
                     <td>
                         <h3><a href="/poolInfo/restoreHandler/*">Tape&nbsp;Transfer&nbsp;Queue</a></h3>
@@ -126,10 +146,10 @@
 
   </tr><tr>
 
-    <td valign="top">
+    <td align="left" bgcolor="#6699cc" valign="top">
         <h1>Statistics <span style="color:red">Module not installed</span></h1>
         <blockquote>
-            <table id="index-container" border="0">
+            <table border="0" cellpadding="10">
                 <tr>
                     <td>
                         <h3><a href="/statistics/">Statistics</a></h3>
@@ -143,10 +163,10 @@
     </td>
 
 
-    <td valign="top">
+    <td align="left" bgcolor="#6699cc" valign="top">
         <h1>Configuration/Setup</h1>
         <blockquote>
-            <table id="index-container" border="0">
+            <table border="0" cellpadding="10">
                 <tr>
                     <td>
                         <h3><a href="/poolInfo">Pool&nbsp;Selection&nbsp;Setup</a></h3>
@@ -161,7 +181,7 @@
 
 </tr>
 <tr>
-   <td bgcolor="#EEEDEB" colspan="2">
+   <td bgcolor="#ffffff" colspan="2">
       <blockquote>
           <h3><a href="https://dcache.org/documentation/" style="color: black">dCache, the Book</a></h3>
       </blockquote>

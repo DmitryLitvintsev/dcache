@@ -1,3 +1,8 @@
+#bird_small
+{
+  float: left;
+}
+
 #bird_large
 {
   display: none;
@@ -50,6 +55,28 @@ table.menu .active a:link
   color: red;
 }
 
+/* Pool info */
+
+span.layout_precious
+{
+  color: red;
+}
+
+span.layout_sticky
+{
+  color: magenta;
+}
+
+span.layout_cached
+{
+  color: green;
+}
+
+span.layout_free
+{
+  color: yellow;
+}
+
 td.layout > div
 {
   margin-left: auto;
@@ -58,21 +85,58 @@ td.layout > div
   height: 10px;
 }
 
+div.layout_precious
+{
+  float: left;
+  background: red;
+  height: 10px;
+}
+
+div.layout_sticky
+{
+  float: left;
+  background: #ff00ff;
+  height: 10px;
+}
+
+div.layout_cached
+{
+  float: left;
+  background: green;
+  height: 10px;
+}
+
+div.layout_free
+{
+  float: left;
+  background: yellow; 
+  height: 10px;
+}
+
+.errorcode, .errormessage
+{ 
+  color: red;
+}
+
 /* Queue info */
 th
 {
   font-weight: normal;
 }
 
-th.active, th.max, th.queued
+th.active, th.max
 {
-  background: #E0CCBE;
-  color: #3C3633;
+  background: #0099FF;
+}
+
+th.queued
+{
+  background: #00bbFF; 
 }
 
 td.idle
 {
-  color: #3C3633;
+  color: #008080;
 }
 
 td.queued
@@ -82,6 +146,6 @@ td.queued
 
 tr.total th, tr.total td
 {
-  background: #747264;
+  background: #0000FF;
   color: white;
 }
