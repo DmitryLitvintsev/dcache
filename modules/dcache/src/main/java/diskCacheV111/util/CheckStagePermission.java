@@ -96,13 +96,14 @@ public class CheckStagePermission {
 
         if (!_allowAnonymousStaging && Subjects.isNobody(subject)) {
             return false;
-        } else if (fileAttributes.isDefined(FileAttribute.STORAGEINFO) &&
-              fileAttributes.getStorageInfo().getKey("path") != null &&
-              restriction.isRestricted(Activity.STAGE,
-                    FsPath.create(fileAttributes.getStorageInfo().getKey("path")))) {
-            LOGGER.debug("Failed to authorize staging for {}", FsPath.create(fileAttributes.getStorageInfo().getKey("path")));
-            return false;
         }
+        // else if (fileAttributes.isDefined(FileAttribute.STORAGEINFO) &&
+        //       fileAttributes.getStorageInfo().getKey("path") != null &&
+        //       restriction.isRestricted(Activity.STAGE,
+        //             FsPath.create(fileAttributes.getStorageInfo().getKey("path")))) {
+        //     LOGGER.debug("Failed to authorize staging for {}", FsPath.create(fileAttributes.getStorageInfo().getKey("path")));
+        //     return false;
+        // }
 
         if (!_isEnabled) {
             return true;
