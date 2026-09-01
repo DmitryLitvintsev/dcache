@@ -1129,6 +1129,13 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler {
         }
     }
 
+    @Override
+    protected XrootdResponse<PrepareRequest> doOnPrepare(ChannelHandlerContext ctx,
+          PrepareRequest msg)
+          throws XrootdException {
+        return withOk(msg);
+    }
+
     private void logDebugOnOpen(OpenRequest req) {
         int options = req.getOptions();
         String openFlags =
