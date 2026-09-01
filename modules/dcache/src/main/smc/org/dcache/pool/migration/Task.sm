@@ -144,21 +144,10 @@ Exit
                         fail(SERVICE_UNAVAILABLE, "Remote pool failed (no route to cell)");
                 }
         copy_failure(rc: Integer, cause: Object)
-                [ rc == LOCKED && ctxt.hasMoreLocations() ]
-                nil
-                {
-                        updateExistingReplica();
-                }
-        copy_failure(rc: Integer, cause: Object)
-                [ rc == LOCKED && !ctxt.isMetaOnly() && ctxt.moreReplicasPossible() ]
-                InitiatingCopy
-                {
-                }
-        copy_failure(rc: Integer, cause: Object)
                 [ rc == LOCKED ]
                 Failed
                 {
-                        fail(rc, "Replica is locked on target pool");
+                        failPermanently(rc, "Replica is locked on target pool");
                 }
         copy_failure(rc: Integer, cause: Object)
                 [ ctxt.hasMoreLocations() ]
