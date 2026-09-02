@@ -441,7 +441,7 @@ public class XrootdDoor
      */
     @Required
     public void setPinLifetime(int lifetime) {
-        if (lifetime <= 0) {
+        if (lifetime < 0) {
             throw new IllegalArgumentException("Pin lifetime must be positive");
         }
         pinLifetime = lifetime;
