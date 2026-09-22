@@ -28,23 +28,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Reproduces the scenario where a target pool rejects a
- * {@link PoolMigrationCopyReplicaMessage} with {@link CacheException#LOCKED} because it
- * currently has a local migration task active for the same file (see
- * MigrationModuleServer#messageArrived(CellMessage, PoolMigrationCopyReplicaMessage), line 121).
+ * Verifies that a target pool rejecting a {@link PoolMigrationCopyReplicaMessage} with
+ * {@link CacheException#LOCKED} causes the migration task to fail permanently right away,
+ * instead of trying other known replica locations.
  * <p>
- * This is expected to happen routinely for "hot" files that are concurrently being replicated
- * to/from several pools: two pools may simultaneously try to migrate the same file to each
- * other, and each check will reject the other's request with LOCKED to avoid a race condition.
- * <p>
- * When a task in the {@code UpdatingExistingFile} state receives such a LOCKED failure while
- * updating one known existing replica location, it should behave exactly like every other
- * failure and try the next known location before giving up (see the {@code hasMoreLocations()}
- * fallback in Task.sm). Instead, the LOCKED case is special-cased to fail the task immediately,
- * without trying any of the other known locations. Since the job simply requeues and retries the
- * whole task again after a fixed delay - reselecting the same locations - a persistently locked
- * target causes the migration job to spin forever in RUNNING/SLEEPING, repeatedly failing against
- * the same target instead of falling back to an alternative that might succeed.
+ * This can happen routinely for "hot" files that are concurrently being replicated to/from
+ * several pools: two pools may simultaneously try to migrate the same file to each other, and
+ * each check will reject the other's request with LOCKED to avoid a race condition. Falling
+ * back to another location in that case simply masks the underlying race and lets the job
+ * spin, so a task in the {@code UpdatingExistingFile} state that receives a LOCKED failure must
+ * fail fast ({@code failPermanently}) rather than trying the next known location (see Task.sm).
  */
 public class MigrationModuleLockedTargetTest {
 
@@ -87,7 +80,7 @@ public class MigrationModuleLockedTargetTest {
     }
 
     @Test
-    public void taskShouldTryNextLocationWhenTargetReportsLocked() {
+    public void taskShouldFailPermanentlyWhenTargetReportsLocked() {
         PnfsId pnfsId = new PnfsId("000000000000000000000001");
 
         FileAttributes fileAttributes = new FileAttributes();
@@ -124,12 +117,11 @@ public class MigrationModuleLockedTargetTest {
         sentRequests.get(0).setException(
               new LockedCacheException("Target file is busy"));
 
-        // There is another known location (pool2) that has not been tried yet, so the task
-        // should fall back to it instead of failing outright - exactly as it would for any
-        // other transient copy failure.
-        assertRequestCount(2);
+        // A LOCKED failure must fail the task permanently right away, without trying pool2 -
+        // trying other locations only masks the underlying race between concurrent migrations.
+        assertRequestCount(1);
         verify(handler, never()).taskFailed(any(), anyInt(), anyString());
-        verify(handler, never()).taskFailedPermanently(any(), anyInt(), anyString());
+        verify(handler).taskFailedPermanently(any(), anyInt(), anyString());
     }
 
     private void assertRequestCount(int expected) {
@@ -137,8 +129,8 @@ public class MigrationModuleLockedTargetTest {
             throw new AssertionError(
                   "Expected " + expected + " copy request(s) to have been sent, but "
                         + sentRequests.size() + " were sent. Known target locations: pool1, pool2. "
-                        + "A LOCKED failure must not cause the task to give up while other "
-                        + "known locations remain untried.");
+                        + "A LOCKED failure must fail the task permanently instead of trying "
+                        + "other known locations.");
         }
     }
 }
